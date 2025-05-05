@@ -2,6 +2,10 @@
 
 A modern Rust implementation of the FEFF code for calculating X-ray absorption spectroscopy (XAS) and related spectroscopies.
 
+[![CI](https://github.com/ameyanagi/feff-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/ameyanagi/feff-rs/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ameyanagi/feff-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/ameyanagi/feff-rs)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Overview
 
 FEFF-rs aims to provide a high-performance, memory-efficient, and maintainable implementation of the FEFF code in Rust. FEFF is a widely used ab initio multiple-scattering code for calculations of excitation spectra and electronic structure.
@@ -18,6 +22,85 @@ This project is under active development and is not yet ready for production use
 - Support multiple spectroscopies (XANES, EXAFS, EELS, XES, etc.)
 - Parallel processing for improved performance
 - Modern CLI with good error messages
+
+## Project Structure
+
+```
+feff-rs/
+├── src/              # Source code
+│   ├── atoms/        # Atomic data and calculations
+│   ├── input/        # Input file parsing
+│   ├── potential/    # Potential calculation
+│   ├── scattering/   # Scattering calculations
+│   ├── path/         # Path finding and filtering
+│   ├── fms/          # Full multiple scattering
+│   ├── xas/          # XAS spectrum calculations
+│   ├── utils/        # Utility functions
+│   └── cli/          # Command-line interface
+├── tests/            # Integration tests
+├── benches/          # Performance benchmarks
+├── docs/             # Documentation
+├── plans/            # Development plans
+└── .github/          # GitHub workflows
+```
+
+## Development
+
+### Building
+
+To build the project, run:
+
+```bash
+cargo build
+```
+
+For a release build:
+
+```bash
+cargo build --release
+```
+
+### Testing
+
+Run the tests with:
+
+```bash
+cargo test
+```
+
+### Benchmarks
+
+Run benchmarks with:
+
+```bash
+cargo bench
+```
+
+### Code Style
+
+This project follows the Rust standard formatting. To check your code:
+
+```bash
+cargo fmt -- --check
+```
+
+To automatically format the code:
+
+```bash
+cargo fmt
+```
+
+### Linting
+
+Run the linter with:
+
+```bash
+cargo clippy
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Project Status
 
