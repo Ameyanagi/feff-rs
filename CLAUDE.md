@@ -29,8 +29,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Write failing tests that validate expected behavior against FEFF10 reference values
    - Implement the code to make tests pass
    - Run tests to verify implementation matches FEFF10 results
+   - Format code: `cargo fmt`
+   - Run linter: `cargo clippy -- -D warnings`
+   - Run pre-commit checks: `uvx pre-commit run`
+   - Fix any issues detected by pre-commit hooks
    - Document the implementation with thorough rustdoc comments including physics explanation
-5. Continuously update README.md with progress and usage instructions
+5. Before committing:
+   - Run `uvx pre-commit run --all-files` to check all code
+   - Fix any formatting, linting, or other issues
+   - Carefully review the changes with `git diff`
+   - Write a clear, descriptive commit message
+6. Continuously update README.md with progress and usage instructions
 
 ## Documentation Retrieval
 - Use context7 for retrieving the latest documentation on Rust, libraries
@@ -100,6 +109,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Performance**: Optimize numerically intensive operations, use faer efficiently
 - **Testing**: Unit test physics correctness against reference values from FEFF10 examples
 - **Interfaces**: Create clean abstractions over FEFF10 functionality with idiomatic Rust APIs
+- **Pre-commit**: Always run `uvx pre-commit run` before committing to ensure code quality
 
 ## Licensing
 - This project uses a hybrid MIT license with FEFF10 attribution requirements
