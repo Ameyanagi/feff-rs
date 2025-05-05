@@ -10,8 +10,11 @@ FEFF-rs is a Rust implementation of the FEFF code for calculating X-ray absorpti
 - [x] Create directory structure
 - [x] Set up licensing with MIT + FEFF10 attribution
 - [x] Configure build environment and dependencies
-- [ ] Set up Git repository and initial commit
-- [ ] Create basic README.md with project description
+- [x] Set up Git repository and initial commit
+- [x] Create basic README.md with project description
+- [x] Configure CI/CD with GitHub Actions
+- [x] Set up pre-commit hooks with uvx
+- [x] Implement branching strategy with main and dev branches
 
 ### 1.2 Core Data Structures and Parser
 - [ ] Define atomic structure representation
@@ -20,10 +23,10 @@ FEFF-rs is a Rust implementation of the FEFF code for calculating X-ray absorpti
 - [ ] Implement serialization/deserialization for all data structures
 
 ### 1.3 Basic Utilities
-- [ ] Implement physical constants and unit conversion utilities
+- [x] Implement physical constants and unit conversion utilities
 - [ ] Create mathematical utility functions
 - [ ] Set up matrix operations using faer
-- [ ] Implement error types and handling
+- [x] Implement error types and handling
 
 ## Phase 2: Core Physics Implementation
 
@@ -80,9 +83,9 @@ FEFF-rs is a Rust implementation of the FEFF code for calculating X-ray absorpti
 
 ### 4.3 Testing and Validation
 - [ ] Comprehensive test suite covering all features
-- [ ] Benchmark suite for performance testing
+- [x] Benchmark suite for performance testing
 - [ ] Complete validation against FEFF10 reference results
-- [ ] Continuous integration setup
+- [x] Continuous integration setup
 
 ## Phase 5: Optimization and Future Development
 
@@ -121,3 +124,8 @@ Total estimated core development time: 12-16 months
 3. **Performance focus**: Optimize critical paths
 4. **Documentation**: Document physics and implementation details
 5. **Validation**: Compare with FEFF10 reference results
+6. **Git workflow**: Use branching strategy for development
+   - `main`: Stable, production-ready code
+   - `dev`: Active development branch
+   - Feature branches: Created from `dev` for specific features
+7. **Quality assurance**: Enforce code quality with pre-commit hooks and CI/CD
