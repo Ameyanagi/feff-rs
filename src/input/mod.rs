@@ -19,7 +19,7 @@ use std::path::Path;
 pub enum InputError {
     #[error("Failed to read input file: {0}")]
     FileReadError(#[from] std::io::Error),
-    
+
     #[error("Invalid input format: {0}")]
     ParseError(String),
 }
@@ -28,6 +28,7 @@ pub enum InputError {
 pub type Result<T> = std::result::Result<T, InputError>;
 
 /// Represents a FEFF input file
+#[derive(Default)]
 pub struct Input {
     // Will be implemented as development progresses
 }
@@ -35,9 +36,9 @@ pub struct Input {
 impl Input {
     /// Create a new empty input structure
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
-    
+
     /// Parse a FEFF input file
     pub fn from_file<P: AsRef<Path>>(_path: P) -> Result<Self> {
         // Will be implemented as development progresses
@@ -48,7 +49,7 @@ impl Input {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_input_creation() {
         // Test creating a new Input instance
