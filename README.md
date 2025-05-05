@@ -46,6 +46,18 @@ feff-rs/
 
 ## Development
 
+### Getting Started
+
+1. Clone the repository
+2. Install pre-commit hooks using `uvx`:
+   ```bash
+   # Install UV if you haven't already
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Install the pre-commit hooks
+   uvx pre-commit install
+   ```
+
 ### Building
 
 To build the project, run:
@@ -101,6 +113,18 @@ cargo clippy
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Pre-commit Hooks
+
+This project uses pre-commit hooks with `uvx pre-commit` to ensure code quality. The hooks run:
+- Clippy linting with warnings as errors
+- Rustfmt checks
+- Cargo check compilation
+- Rustfmt.toml validation
+- Unit tests
+- Check for yanked dependencies
+
+When you commit changes, these checks will run automatically if you've installed the hooks.
 
 ## Project Status
 

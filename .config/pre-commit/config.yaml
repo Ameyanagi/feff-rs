@@ -1,0 +1,12 @@
+# Pre-commit configuration for uvx pre-commit
+# To use, run: uvx pre-commit install
+
+hooks:
+  - id: clippy
+    args: ["--", "-D", "warnings"]
+  - id: fmt
+    args: ["--", "--check"]
+  - id: cargo-check
+  - id: rustfmt-toml-check
+  - id: cargo-test
+  - id: yanked-dependencies
