@@ -12,8 +12,6 @@ All rights reserved.
 //!
 //! This module provides common utilities used throughout the FEFF code.
 
-use num_complex::Complex64;
-
 /// Physical constants used in FEFF calculations
 pub mod constants {
     /// Speed of light in atomic units

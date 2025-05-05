@@ -12,8 +12,6 @@ All rights reserved.
 //!
 //! This module provides atomic data and calculations for FEFF.
 
-use num_complex::Complex64;
-
 /// Error types for the atoms module
 #[derive(Debug, thiserror::Error)]
 pub enum AtomError {

@@ -51,7 +51,9 @@ mod tests {
     
     #[test]
     fn test_input_creation() {
-        let input = Input::new();
-        assert!(input.from_file("test.inp").is_ok());
+        // Test creating a new Input instance
+        let _input = Input::new();
+        // Test static method to create from file
+        assert!(Input::from_file("test.inp").is_ok());
     }
 }
