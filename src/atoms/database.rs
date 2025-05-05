@@ -525,6 +525,149 @@ pub fn l1_edge_energy(atomic_number: i32) -> Option<f64> {
     }
 }
 
+/// Returns the atomic number for an element symbol
+///
+/// This function is case-insensitive and will handle both "Fe" and "FE"
+pub fn atomic_number_from_symbol(symbol: &str) -> Option<i32> {
+    // Convert to title case for consistent lookup
+    let symbol = symbol.to_lowercase();
+    let symbol = match symbol.len() {
+        1 => symbol.to_uppercase(),
+        2..=3 => {
+            let mut chars = symbol.chars();
+            let first = chars.next().unwrap().to_uppercase().to_string();
+            let rest: String = chars.collect();
+            format!("{}{}", first, rest)
+        }
+        _ => return None,
+    };
+
+    // Handle special case for two-character symbols with trailing whitespace
+    let symbol = symbol.trim();
+
+    match symbol {
+        "H" => Some(1),
+        "He" => Some(2),
+        "Li" => Some(3),
+        "Be" => Some(4),
+        "B" => Some(5),
+        "C" => Some(6),
+        "N" => Some(7),
+        "O" => Some(8),
+        "F" => Some(9),
+        "Ne" => Some(10),
+        "Na" => Some(11),
+        "Mg" => Some(12),
+        "Al" => Some(13),
+        "Si" => Some(14),
+        "P" => Some(15),
+        "S" => Some(16),
+        "Cl" => Some(17),
+        "Ar" => Some(18),
+        "K" => Some(19),
+        "Ca" => Some(20),
+        "Sc" => Some(21),
+        "Ti" => Some(22),
+        "V" => Some(23),
+        "Cr" => Some(24),
+        "Mn" => Some(25),
+        "Fe" => Some(26),
+        "Co" => Some(27),
+        "Ni" => Some(28),
+        "Cu" => Some(29),
+        "Zn" => Some(30),
+        "Ga" => Some(31),
+        "Ge" => Some(32),
+        "As" => Some(33),
+        "Se" => Some(34),
+        "Br" => Some(35),
+        "Kr" => Some(36),
+        "Rb" => Some(37),
+        "Sr" => Some(38),
+        "Y" => Some(39),
+        "Zr" => Some(40),
+        "Nb" => Some(41),
+        "Mo" => Some(42),
+        "Tc" => Some(43),
+        "Ru" => Some(44),
+        "Rh" => Some(45),
+        "Pd" => Some(46),
+        "Ag" => Some(47),
+        "Cd" => Some(48),
+        "In" => Some(49),
+        "Sn" => Some(50),
+        "Sb" => Some(51),
+        "Te" => Some(52),
+        "I" => Some(53),
+        "Xe" => Some(54),
+        "Cs" => Some(55),
+        "Ba" => Some(56),
+        "La" => Some(57),
+        "Ce" => Some(58),
+        "Pr" => Some(59),
+        "Nd" => Some(60),
+        "Pm" => Some(61),
+        "Sm" => Some(62),
+        "Eu" => Some(63),
+        "Gd" => Some(64),
+        "Tb" => Some(65),
+        "Dy" => Some(66),
+        "Ho" => Some(67),
+        "Er" => Some(68),
+        "Tm" => Some(69),
+        "Yb" => Some(70),
+        "Lu" => Some(71),
+        "Hf" => Some(72),
+        "Ta" => Some(73),
+        "W" => Some(74),
+        "Re" => Some(75),
+        "Os" => Some(76),
+        "Ir" => Some(77),
+        "Pt" => Some(78),
+        "Au" => Some(79),
+        "Hg" => Some(80),
+        "Tl" => Some(81),
+        "Pb" => Some(82),
+        "Bi" => Some(83),
+        "Po" => Some(84),
+        "At" => Some(85),
+        "Rn" => Some(86),
+        "Fr" => Some(87),
+        "Ra" => Some(88),
+        "Ac" => Some(89),
+        "Th" => Some(90),
+        "Pa" => Some(91),
+        "U" => Some(92),
+        "Np" => Some(93),
+        "Pu" => Some(94),
+        "Am" => Some(95),
+        "Cm" => Some(96),
+        "Bk" => Some(97),
+        "Cf" => Some(98),
+        "Es" => Some(99),
+        "Fm" => Some(100),
+        "Md" => Some(101),
+        "No" => Some(102),
+        "Lr" => Some(103),
+        "Rf" => Some(104),
+        "Db" => Some(105),
+        "Sg" => Some(106),
+        "Bh" => Some(107),
+        "Hs" => Some(108),
+        "Mt" => Some(109),
+        "Ds" => Some(110),
+        "Rg" => Some(111),
+        "Cn" => Some(112),
+        "Nh" => Some(113),
+        "Fl" => Some(114),
+        "Mc" => Some(115),
+        "Lv" => Some(116),
+        "Ts" => Some(117),
+        "Og" => Some(118),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -538,6 +681,19 @@ mod tests {
         assert_eq!(element_symbol(118), Some("Og"));
         assert_eq!(element_symbol(0), None);
         assert_eq!(element_symbol(119), None);
+    }
+
+    #[test]
+    fn test_atomic_number_from_symbol() {
+        assert_eq!(atomic_number_from_symbol("H"), Some(1));
+        assert_eq!(atomic_number_from_symbol("h"), Some(1));
+        assert_eq!(atomic_number_from_symbol("Fe"), Some(26));
+        assert_eq!(atomic_number_from_symbol("fe"), Some(26));
+        assert_eq!(atomic_number_from_symbol("FE"), Some(26));
+        assert_eq!(atomic_number_from_symbol("U"), Some(92));
+        assert_eq!(atomic_number_from_symbol("Og"), Some(118));
+        assert_eq!(atomic_number_from_symbol("Xx"), None);
+        assert_eq!(atomic_number_from_symbol(""), None);
     }
 
     #[test]

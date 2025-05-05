@@ -412,7 +412,7 @@ impl fmt::Display for PotentialType {
 
 /// AtomicStructure represents a collection of atoms for FEFF calculations
 /// This is equivalent to the cluster in FEFF10
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AtomicStructure {
     /// List of atoms in the structure
     atoms: Vec<Atom>,
