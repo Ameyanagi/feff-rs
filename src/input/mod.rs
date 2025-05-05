@@ -124,9 +124,17 @@ impl FeffInputParser {
                 "PRINT" => self.parse_print_card(card, &mut feff_input)?,
                 "CORRECTIONS" => self.parse_corrections_card(card, &mut feff_input)?,
                 "S02" => self.parse_s02_card(card, &mut feff_input)?,
-                // Add other card types as needed
+                "EDGE" => self.parse_edge_card(card, &mut feff_input)?,
+                "DEBYE" => self.parse_debye_card(card, &mut feff_input)?,
+                "LDOS" => self.parse_ldos_card(card, &mut feff_input)?,
+                "EXAFS" => self.parse_exafs_card(card, &mut feff_input)?,
+                "DANES" => self.parse_danes_card(card, &mut feff_input)?,
+                "COREHOLE" => self.parse_corehole_card(card, &mut feff_input)?,
+                "POLARIZATION" => self.parse_polarization_card(card, &mut feff_input)?,
+                "REAL" => self.parse_real_card(card, &mut feff_input)?,
+                "RECIPROCAL" => self.parse_reciprocal_card(card, &mut feff_input)?,
+                // Unknown card, store it for future reference
                 _ => {
-                    // Unknown card, store it for future reference
                     feff_input.unknown_cards.push(card.clone());
                 }
             }
@@ -754,6 +762,243 @@ impl FeffInputParser {
         input.s02 = Some(s02);
         Ok(())
     }
+
+    /// Parse EDGE card - absorption edge parameters
+    fn parse_edge_card(&self, card: &Card, input: &mut FeffInput) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: EDGE K [energy]
+        if !fields.is_empty() {
+            let edge = EdgeParams {
+                edge_type: fields[0].to_string(),
+                energy: if fields.len() > 1 {
+                    fields[1].parse::<f64>().ok()
+                } else {
+                    None
+                },
+            };
+
+            input.edge = Some(edge);
+        }
+
+        Ok(())
+    }
+
+    /// Parse DEBYE card - thermal effects parameters
+    fn parse_debye_card(&self, card: &Card, input: &mut FeffInput) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: DEBYE temp [debye_waller [correlated_debye]]
+        if !fields.is_empty() {
+            let debye = DebyeParams {
+                temp: fields[0].parse().unwrap_or(300.0),
+                debye_waller_factor: if fields.len() > 1 {
+                    fields[1].parse().unwrap_or(0.0)
+                } else {
+                    0.0
+                },
+                correlated_debye: if fields.len() > 2 {
+                    fields[2].parse::<i32>().unwrap_or(0) > 0
+                } else {
+                    false
+                },
+            };
+
+            input.debye = Some(debye);
+        }
+
+        Ok(())
+    }
+
+    /// Parse LDOS card - local density of states parameters
+    fn parse_ldos_card(&self, card: &Card, input: &mut FeffInput) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: LDOS emin emax estep
+        if fields.len() >= 3 {
+            let ldos = LdosParams {
+                emin: fields[0].parse().unwrap_or(-20.0),
+                emax: fields[1].parse().unwrap_or(20.0),
+                estep: fields[2].parse().unwrap_or(0.1),
+            };
+
+            input.ldos = Some(ldos);
+        }
+
+        Ok(())
+    }
+
+    /// Parse EXAFS card - extended X-ray absorption fine structure parameters
+    fn parse_exafs_card(&self, card: &Card, input: &mut FeffInput) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: EXAFS emin emax estep
+        if fields.len() >= 3 {
+            let exafs = ExafsParams {
+                emin: fields[0].parse().unwrap_or(0.0),
+                emax: fields[1].parse().unwrap_or(1000.0),
+                estep: fields[2].parse().unwrap_or(0.5),
+            };
+
+            input.exafs = Some(exafs);
+        }
+
+        Ok(())
+    }
+
+    /// Parse DANES card - differential anomalous scattering parameters
+    fn parse_danes_card(&self, card: &Card, input: &mut FeffInput) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: DANES radius [params...]
+        if !fields.is_empty() {
+            let radius = fields[0].parse().unwrap_or(5.0);
+
+            // Parse any additional parameters
+            let mut parameters = Vec::new();
+            for field in fields.iter().skip(1) {
+                if let Ok(param) = field.parse::<f64>() {
+                    parameters.push(param);
+                }
+            }
+
+            let danes = DanesParams { radius, parameters };
+
+            input.danes = Some(danes);
+        }
+
+        Ok(())
+    }
+
+    /// Parse COREHOLE card - core hole treatment parameters
+    fn parse_corehole_card(&self, card: &Card, input: &mut FeffInput) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: COREHOLE treatment [params...]
+        if !fields.is_empty() {
+            let treatment = fields[0].to_string();
+
+            // Parse any additional parameters
+            let mut params = Vec::new();
+            for field in fields.iter().skip(1) {
+                if let Ok(param) = field.parse::<f64>() {
+                    params.push(param);
+                }
+            }
+
+            let corehole = CoreholeParams { treatment, params };
+
+            input.corehole = Some(corehole);
+        }
+
+        Ok(())
+    }
+
+    /// Parse POLARIZATION card - polarization vector parameters
+    fn parse_polarization_card(
+        &self,
+        card: &Card,
+        input: &mut FeffInput,
+    ) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: POLARIZATION x y z [ellipticity]
+        if fields.len() >= 3 {
+            let polarization = PolarizationParams {
+                x: fields[0].parse().unwrap_or(1.0),
+                y: fields[1].parse().unwrap_or(0.0),
+                z: fields[2].parse().unwrap_or(0.0),
+                ellipticity: if fields.len() > 3 {
+                    fields[3].parse::<f64>().ok()
+                } else {
+                    None
+                },
+            };
+
+            input.polarization = Some(polarization);
+        }
+
+        Ok(())
+    }
+
+    /// Parse REAL card - real space grid parameters
+    fn parse_real_card(&self, card: &Card, input: &mut FeffInput) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: REAL spacing size
+        if fields.len() >= 2 {
+            let real_grid = RealParams {
+                spacing: fields[0].parse().unwrap_or(0.05),
+                size: fields[1].parse().unwrap_or(100),
+            };
+
+            input.real_grid = Some(real_grid);
+        }
+
+        Ok(())
+    }
+
+    /// Parse RECIPROCAL card - reciprocal space grid parameters
+    fn parse_reciprocal_card(&self, card: &Card, input: &mut FeffInput) -> Result<(), InputError> {
+        if card.content.is_empty() {
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: RECIPROCAL spacing size
+        if fields.len() >= 2 {
+            let reciprocal_grid = ReciprocalParams {
+                spacing: fields[0].parse().unwrap_or(0.05),
+                size: fields[1].parse().unwrap_or(100),
+            };
+
+            input.reciprocal_grid = Some(reciprocal_grid);
+        }
+
+        Ok(())
+    }
 }
 
 /// Helper function to check if a string is a valid FEFF card name
@@ -884,6 +1129,97 @@ pub struct S02Params {
     pub s02: f64,
 }
 
+/// EDGE card parameters
+#[derive(Debug, Clone, Default)]
+pub struct EdgeParams {
+    /// Edge type (K, L1, L2, L3, etc.)
+    pub edge_type: String,
+    /// Edge energy in eV (if specified)
+    pub energy: Option<f64>,
+}
+
+/// DEBYE card parameters for thermal effects
+#[derive(Debug, Clone, Default)]
+pub struct DebyeParams {
+    /// Debye temperature in K
+    pub temp: f64,
+    /// Debye-Waller factor
+    pub debye_waller_factor: f64,
+    /// Correlated Debye flag
+    pub correlated_debye: bool,
+}
+
+/// LDOS card parameters for local density of states calculation
+#[derive(Debug, Clone, Default)]
+pub struct LdosParams {
+    /// Lower energy bound in eV
+    pub emin: f64,
+    /// Upper energy bound in eV
+    pub emax: f64,
+    /// Energy step in eV
+    pub estep: f64,
+}
+
+/// EXAFS card parameters
+#[derive(Debug, Clone, Default)]
+pub struct ExafsParams {
+    /// Lower energy bound in eV
+    pub emin: f64,
+    /// Upper energy bound in eV
+    pub emax: f64,
+    /// Energy step in eV
+    pub estep: f64,
+}
+
+/// DANES card parameters for differential ANES
+#[derive(Debug, Clone, Default)]
+pub struct DanesParams {
+    /// Radius for DANES calculation
+    pub radius: f64,
+    /// Additional parameters
+    pub parameters: Vec<f64>,
+}
+
+/// COREHOLE card parameters
+#[derive(Debug, Clone, Default)]
+pub struct CoreholeParams {
+    /// Core hole treatment method (RPA, FSR, etc.)
+    pub treatment: String,
+    /// Additional parameters
+    pub params: Vec<f64>,
+}
+
+/// POLARIZATION card parameters
+#[derive(Debug, Clone, Default)]
+pub struct PolarizationParams {
+    /// X component of polarization vector
+    pub x: f64,
+    /// Y component of polarization vector
+    pub y: f64,
+    /// Z component of polarization vector
+    pub z: f64,
+    /// Ellipticity (if specified)
+    pub ellipticity: Option<f64>,
+}
+
+/// REAL card parameters for real space grid
+#[derive(Debug, Clone, Default)]
+pub struct RealParams {
+    /// Grid spacing
+    pub spacing: f64,
+    /// Grid size
+    pub size: i32,
+}
+
+/// RECIPROCAL card parameters for reciprocal space grid
+#[derive(Debug, Clone, Default)]
+pub struct ReciprocalParams {
+    /// Grid spacing
+    pub spacing: f64,
+    /// Grid size
+    pub size: i32,
+}
+
 /// Main FEFF input data structure
 #[derive(Debug, Default)]
 pub struct FeffInput {
@@ -925,6 +1261,33 @@ pub struct FeffInput {
 
     /// S02 scaling factor
     pub s02: Option<S02Params>,
+
+    /// EDGE card parameters
+    pub edge: Option<EdgeParams>,
+
+    /// DEBYE card parameters
+    pub debye: Option<DebyeParams>,
+
+    /// LDOS card parameters
+    pub ldos: Option<LdosParams>,
+
+    /// EXAFS card parameters
+    pub exafs: Option<ExafsParams>,
+
+    /// DANES card parameters
+    pub danes: Option<DanesParams>,
+
+    /// COREHOLE card parameters
+    pub corehole: Option<CoreholeParams>,
+
+    /// POLARIZATION card parameters
+    pub polarization: Option<PolarizationParams>,
+
+    /// REAL space grid parameters
+    pub real_grid: Option<RealParams>,
+
+    /// RECIPROCAL space grid parameters
+    pub reciprocal_grid: Option<ReciprocalParams>,
 
     /// Unknown cards
     pub unknown_cards: Vec<Card>,
@@ -1059,6 +1422,98 @@ impl FeffInput {
         // Write S02 card if available
         if let Some(s02) = &self.s02 {
             writeln!(writer, "S02 {}", s02.s02).map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write EDGE card if available
+        if let Some(edge) = &self.edge {
+            let energy_str = if let Some(energy) = edge.energy {
+                format!(" {}", energy)
+            } else {
+                String::new()
+            };
+            writeln!(writer, "EDGE {}{}", edge.edge_type, energy_str)
+                .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write DEBYE card if available
+        if let Some(debye) = &self.debye {
+            writeln!(
+                writer,
+                "DEBYE {} {} {}",
+                debye.temp,
+                debye.debye_waller_factor,
+                if debye.correlated_debye { 1 } else { 0 }
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write LDOS card if available
+        if let Some(ldos) = &self.ldos {
+            writeln!(writer, "LDOS {} {} {}", ldos.emin, ldos.emax, ldos.estep)
+                .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write EXAFS card if available
+        if let Some(exafs) = &self.exafs {
+            writeln!(
+                writer,
+                "EXAFS {} {} {}",
+                exafs.emin, exafs.emax, exafs.estep
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write DANES card if available
+        if let Some(danes) = &self.danes {
+            let mut line = format!("DANES {}", danes.radius);
+            for param in &danes.parameters {
+                line.push_str(&format!(" {}", param));
+            }
+            writeln!(writer, "{}", line).map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write COREHOLE card if available
+        if let Some(corehole) = &self.corehole {
+            let mut line = format!("COREHOLE {}", corehole.treatment);
+            for param in &corehole.params {
+                line.push_str(&format!(" {}", param));
+            }
+            writeln!(writer, "{}", line).map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write POLARIZATION card if available
+        if let Some(pol) = &self.polarization {
+            let ellipticity_str = if let Some(ellipticity) = pol.ellipticity {
+                format!(" {}", ellipticity)
+            } else {
+                String::new()
+            };
+            writeln!(
+                writer,
+                "POLARIZATION {} {} {}{}",
+                pol.x, pol.y, pol.z, ellipticity_str
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write REAL card if available
+        if let Some(real) = &self.real_grid {
+            writeln!(writer, "REAL {} {}", real.spacing, real.size).map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write RECIPROCAL card if available
+        if let Some(recip) = &self.reciprocal_grid {
+            writeln!(writer, "RECIPROCAL {} {}", recip.spacing, recip.size)
+                .map_err(InputError::IoError)?;
             writeln!(writer).map_err(InputError::IoError)?;
         }
 
