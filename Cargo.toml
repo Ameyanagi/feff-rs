@@ -1,0 +1,56 @@
+[package]
+name = "feff-rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ameyanagi"]
+description = "A Rust implementation of the FEFF code for X-ray absorption spectroscopy calculations"
+license = "MIT"
+repository = "https://github.com/ameyanagi/feff-rs"
+readme = "README.md"
+keywords = ["physics", "spectroscopy", "xas", "computational-chemistry"]
+categories = ["science", "simulation"]
+
+[dependencies]
+anyhow = "1.0.98"
+thiserror = "2.0.12"
+clap = { version = "4.5.37", features = ["derive"] }
+rayon = "1.10.0"
+num-complex = "0.4.6"
+faer = "0.22.6"
+faer-core = "0.17.1"
+faer-ext = { version = "0.6.0", features = ["ndarray"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+ndarray = "0.16.1"
+log = "0.4.21"
+env_logger = "0.11.3"
+
+[dev-dependencies]
+criterion = "0.5.1"
+rstest = "0.25.0"
+tempfile = "3.10.1"
+approx = "0.5.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.dev.package.faer]
+opt-level = 3
+
+[profile.bench]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = false
+
+[[bench]]
+name = "benchmarks"
+harness = false
