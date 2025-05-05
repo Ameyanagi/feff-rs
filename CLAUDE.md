@@ -14,20 +14,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Documentation: `cargo doc --open`
 
 ## Development Approach
+- **FEFF10 First**: Always consult the original FEFF10 source code before implementing any functionality
 - **TDD**: Write failing tests first, then implement code to make them pass
 - **Error Handling**: Use anyhow for application errors, thiserror for library errors
 - **Parallelism**: Use rayon for data parallelism where applicable
 
 ## Development Workflow
-1. Create a detailed implementation plan before writing any code
-2. Document the current state and intended outcome
-3. For each component:
-   - Design the API and data structures
-   - Write failing tests that validate expected behavior
+1. ALWAYS check the FEFF10 source code to understand the original implementation
+2. Create a detailed implementation plan before writing any code
+3. Document the current state and intended outcome
+4. For each component:
+   - Study FEFF10's approach to the problem thoroughly
+   - Design the API and data structures to match FEFF10's physics while using idiomatic Rust
+   - Write failing tests that validate expected behavior against FEFF10 reference values
    - Implement the code to make tests pass
-   - Run tests to verify implementation
-   - Document the implementation with thorough rustdoc comments
-4. Continuously update README.md with progress and usage instructions
+   - Run tests to verify implementation matches FEFF10 results
+   - Document the implementation with thorough rustdoc comments including physics explanation
+5. Continuously update README.md with progress and usage instructions
 
 ## Documentation Retrieval
 - Use context7 for retrieving the latest documentation on Rust, libraries
