@@ -20,14 +20,14 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      
+
       # Run benchmarks and save results
       - name: Run benchmarks
         uses: actions-rs/cargo@v1
         with:
           command: bench
           args: --bench benchmarks -- --output-format bencher | tee output.txt
-      
+
       # Only save benchmark results on main/master branch
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1

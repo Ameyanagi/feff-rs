@@ -13,7 +13,7 @@ use feff_rs::utils::{angstrom_to_bohr, bohr_to_angstrom, ev_to_hartree, hartree_
 
 fn unit_conversion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("Unit Conversions");
-    
+
     group.bench_function("angstrom_to_bohr", |b| {
         b.iter(|| {
             for i in 0..1000 {
@@ -21,7 +21,7 @@ fn unit_conversion_benchmark(c: &mut Criterion) {
             }
         })
     });
-    
+
     group.bench_function("bohr_to_angstrom", |b| {
         b.iter(|| {
             for i in 0..1000 {
@@ -29,7 +29,7 @@ fn unit_conversion_benchmark(c: &mut Criterion) {
             }
         })
     });
-    
+
     group.bench_function("ev_to_hartree", |b| {
         b.iter(|| {
             for i in 0..1000 {
@@ -37,7 +37,7 @@ fn unit_conversion_benchmark(c: &mut Criterion) {
             }
         })
     });
-    
+
     group.bench_function("hartree_to_ev", |b| {
         b.iter(|| {
             for i in 0..1000 {
@@ -45,7 +45,7 @@ fn unit_conversion_benchmark(c: &mut Criterion) {
             }
         })
     });
-    
+
     group.finish();
 }
 

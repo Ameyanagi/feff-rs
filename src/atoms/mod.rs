@@ -17,7 +17,7 @@ All rights reserved.
 pub enum AtomError {
     #[error("Invalid atomic number: {0}")]
     InvalidAtomicNumber(i32),
-    
+
     #[error("Calculation error: {0}")]
     CalculationError(String),
 }
@@ -38,19 +38,19 @@ impl Atom {
         if atomic_number <= 0 || atomic_number > 118 {
             return Err(AtomError::InvalidAtomicNumber(atomic_number));
         }
-        
+
         // Will be expanded with proper symbol lookup
         Ok(Self {
             atomic_number,
             symbol: format!("Element{}", atomic_number),
         })
     }
-    
+
     /// Get the atomic number
     pub fn atomic_number(&self) -> i32 {
         self.atomic_number
     }
-    
+
     /// Get the atomic symbol
     pub fn symbol(&self) -> &str {
         &self.symbol
@@ -60,13 +60,13 @@ impl Atom {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_atom_creation() {
         let atom = Atom::new(29).unwrap(); // Copper
         assert_eq!(atom.atomic_number(), 29);
     }
-    
+
     #[test]
     fn test_invalid_atom() {
         assert!(Atom::new(0).is_err());

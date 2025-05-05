@@ -15,7 +15,7 @@ fn test_atom_creation() {
     // Test valid atom creation
     let atom = Atom::new(29).unwrap(); // Copper
     assert_eq!(atom.atomic_number(), 29);
-    
+
     // Test atom symbol (placeholder implementation for now)
     assert_eq!(atom.symbol(), "Element29");
 }

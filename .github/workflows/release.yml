@@ -29,14 +29,14 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      
+
       # Build with optimizations
       - name: Build
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release
-      
+
       # Prepare the artifact
       - name: Prepare artifact
         run: |
@@ -46,7 +46,7 @@ jobs:
             cp target/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
           fi
         shell: bash
-      
+
       # Upload binaries to release
       - name: Upload binaries to release
         uses: softprops/action-gh-release@v1

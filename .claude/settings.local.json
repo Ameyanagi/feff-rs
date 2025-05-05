@@ -8,7 +8,15 @@
       "Bash(git commit:*)",
       "Bash(cargo:*)",
       "Bash(cargo test)",
-      "Bash(cargo run:*)"
+      "Bash(cargo run:*)",
+      "Bash(rm:*)",
+      "Bash(gh repo set-default:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git push:*)",
+      "Bash(uvx pre-commit:*)",
+      "Bash(uvx pre-commit run:*)"
     ],
     "deny": []
   }
