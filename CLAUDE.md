@@ -41,6 +41,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Write a clear, descriptive commit message
 6. Continuously update README.md with progress and usage instructions
 
+## Multi-Agent Development
+When working with multiple agents on this codebase, follow these guidelines:
+1. **Task Distribution**:
+   - Divide work by modules or independent components
+   - Assign specific physics domains to specialized agents
+   - Avoid having multiple agents modify the same file simultaneously
+   
+2. **Coordination**:
+   - Create a task plan at the beginning of multi-agent sessions
+   - Document which agent is responsible for which components
+   - Use pull requests for integrating changes from different agents
+   
+3. **Integration Process**:
+   - Designate one agent as the integration coordinator
+   - Have specialized agents focus on physics domains they understand best
+   - Use feature branches for parallel development
+   - Integrate changes only after all component tests pass
+   
+4. **Communication**:
+   - Pass implementation plans between agents
+   - Share any discovered insights about FEFF10 implementation
+   - Document decisions about API design and physics implementations
+   - Maintain a shared understanding of component interfaces
+
 ## Documentation Retrieval
 - Use context7 for retrieving the latest documentation on Rust, libraries
 - Faer documentation: https://docs.rs/faer/latest/faer/
@@ -102,12 +126,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Code Style Guidelines
 - **Formatting**: Follow Rust standard formatting with `cargo fmt`
-- **Naming**: Use physics-meaningful names that describe physical quantities
-- **Organization**: Split code into modules matching FEFF components (input, potential, scattering, etc.)
+- **Naming**: 
+  - Use physics-meaningful names that describe physical quantities (e.g., `fermi_energy` instead of `ef`)
+  - Avoid single-letter variable names or cryptic abbreviations even if used in original FEFF code (e.g., use `scattering_amplitude` instead of `feff`)
+  - Prefer descriptive function names that convey the physical process (e.g., `calculate_photoelectron_mean_free_path` instead of `calc_mfp`)
+  - Include units in comments or documentation where relevant (e.g., `// energy in eV`)
+  - For established physics formulas, include comments with the standard equation notation
+- **Organization**: 
+  - Split code into modules matching FEFF components (input, potential, scattering, etc.)
+  - Within each module, separate distinct functionality into dedicated files:
+    - Split large `mod.rs` files into multiple smaller files with focused responsibilities
+    - Use `mod.rs` for re-exporting and module-level documentation only
+    - Group related types and functions into their own files (e.g., `atoms/vector.rs`, `atoms/structure.rs`)
+    - Place internal utility functions in a dedicated `utils.rs` file within each module
+    - Define all error types in a dedicated `errors.rs` file within each module
+  - Example module structure:
+    ```
+    src/
+      atoms/
+        mod.rs           # Re-exports, module documentation
+        errors.rs        # Error types for the module
+        vector.rs        # Vector3D implementation
+        atom.rs          # Atom implementation
+        structure.rs     # AtomicStructure implementation
+        potential.rs     # PotentialType implementation
+        coordinates.rs   # Coordinate conversion functions
+        utils.rs         # Internal utility functions
+    ```
 - **Documentation**: All public APIs must have rustdoc comments with physics explanation
-- **Error Types**: Define specific error types with thiserror for each module
+- **Error Types**: Define specific error types with thiserror for each module in a dedicated `errors.rs` file
 - **Performance**: Optimize numerically intensive operations, use faer efficiently
-- **Testing**: Unit test physics correctness against reference values from FEFF10 examples
+- **Testing**: 
+  - Unit test physics correctness against reference values from FEFF10 examples
+  - Place small unit tests in each source file under `#[cfg(test)]` modules
+  - Place larger integration tests in the `tests/` directory organized by module
 - **Interfaces**: Create clean abstractions over FEFF10 functionality with idiomatic Rust APIs
 - **Pre-commit**: Always run `uvx pre-commit run` before committing to ensure code quality
 
