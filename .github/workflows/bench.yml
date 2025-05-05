@@ -1,0 +1,44 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark:
+    name: Run benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      
+      # Run benchmarks and save results
+      - name: Run benchmarks
+        uses: actions-rs/cargo@v1
+        with:
+          command: bench
+          args: --bench benchmarks -- --output-format bencher | tee output.txt
+      
+      # Only save benchmark results on main/master branch
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          name: Rust Benchmark
+          tool: 'cargo'
+          output-file-path: output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          # Show alert with commit comment on detecting performance regression
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: true
