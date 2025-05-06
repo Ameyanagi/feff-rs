@@ -13,6 +13,7 @@ All rights reserved.
 use super::atom::Atom;
 use super::errors::{AtomError, Result};
 use super::potential::PotentialType;
+use super::vector::Vector3D;
 
 /// AtomicStructure represents a collection of atoms for FEFF calculations
 /// This is equivalent to the cluster in FEFF10
@@ -76,6 +77,22 @@ impl AtomicStructure {
         let pot_index = self.potential_types.len();
         self.potential_types.push(potential);
         pot_index
+    }
+
+    /// Replace an existing potential type with a new one
+    pub fn replace_potential_type(&mut self, index: usize, pot: PotentialType) -> Result<()> {
+        if index >= self.potential_types.len() {
+            return Err(AtomError::InvalidPotentialType(index as i32));
+        }
+
+        // Ensure the new potential has the same index as the one being replaced
+        let current_index = self.potential_types[index].index();
+        if pot.index() != current_index {
+            return Err(AtomError::InvalidPotentialType(pot.index()));
+        }
+
+        self.potential_types[index] = pot;
+        Ok(())
     }
 
     /// Set the central atom index
@@ -189,6 +206,200 @@ impl AtomicStructure {
         }
 
         result
+    }
+
+    /// Calculate the muffin-tin radii for all potential types in the structure
+    /// This updates the muffin-tin radius for each potential type
+    pub fn calculate_muffin_tin_radii(&mut self) -> Result<Vec<f64>> {
+        if self.atoms.is_empty() {
+            return Err(AtomError::CalculationError(
+                "Cannot calculate muffin-tin radii without atoms".to_string(),
+            ));
+        }
+
+        let mut radii = Vec::with_capacity(self.potential_types.len());
+
+        // Process each potential type
+        for pot_idx in 0..self.potential_types.len() {
+            // Create a filtered list of atoms for this potential type
+            let atoms_of_this_type: Vec<&Atom> = self
+                .atoms
+                .iter()
+                .filter(|a| a.potential_type() as usize == pot_idx)
+                .collect();
+
+            if atoms_of_this_type.is_empty() {
+                // If no atoms of this type, use default radius
+                let default_radius = self.potential_types[pot_idx].default_muffin_tin_radius();
+                self.potential_types[pot_idx].set_muffin_tin_radius(default_radius);
+                radii.push(default_radius);
+                continue;
+            }
+
+            // Calculate optimal radius for this potential type using all atoms
+            let radius = self.potential_types[pot_idx]
+                .calculate_optimal_muffin_tin_radius(&atoms_of_this_type, &self.atoms)?;
+
+            radii.push(radius);
+        }
+
+        Ok(radii)
+    }
+
+    /// Create a cluster centered on the specified atom with a given radius
+    pub fn create_cluster(&self, center_idx: usize, radius: f64) -> Result<Self> {
+        if center_idx >= self.atoms.len() {
+            return Err(AtomError::CalculationError(format!(
+                "Center atom index {} out of range (max {})",
+                center_idx,
+                self.atoms.len() - 1
+            )));
+        }
+
+        let center = *self.atoms[center_idx].position();
+        let mut cluster = Self::with_title(&format!("Cluster centered on atom {}", center_idx));
+
+        // Copy the potential types
+        for pot in &self.potential_types {
+            cluster.add_potential_type(pot.clone());
+        }
+
+        // Add atoms within the radius
+        let mut center_added = false;
+        for (idx, atom) in self.atoms.iter().enumerate() {
+            let distance = Vector3D::new(
+                atom.position().x - center.x,
+                atom.position().y - center.y,
+                atom.position().z - center.z,
+            )
+            .length();
+
+            if distance <= radius {
+                let atom_idx = cluster.add_atom(atom.clone());
+
+                // Set the center atom
+                if idx == center_idx {
+                    cluster.set_central_atom(atom_idx)?;
+                    center_added = true;
+                }
+            }
+        }
+
+        if !center_added {
+            return Err(AtomError::CalculationError(
+                "Center atom was not included in the cluster".to_string(),
+            ));
+        }
+
+        Ok(cluster)
+    }
+
+    /// Calculate the total overlap volume for all muffin-tin spheres
+    pub fn calculate_total_overlap_volume(&self) -> Result<f64> {
+        if self.potential_types.is_empty() || self.atoms.is_empty() {
+            return Err(AtomError::CalculationError(
+                "Cannot calculate overlap volume without atoms and potentials".to_string(),
+            ));
+        }
+
+        let mut total_overlap = 0.0;
+
+        // For each pair of atoms
+        for i in 0..self.atoms.len() {
+            for j in (i + 1)..self.atoms.len() {
+                let atom1 = &self.atoms[i];
+                let atom2 = &self.atoms[j];
+
+                let pot_type1 = self
+                    .potential_types
+                    .get(atom1.potential_type() as usize)
+                    .ok_or_else(|| {
+                        AtomError::CalculationError(format!(
+                            "Invalid potential type index: {}",
+                            atom1.potential_type()
+                        ))
+                    })?;
+
+                let pot_type2 = self
+                    .potential_types
+                    .get(atom2.potential_type() as usize)
+                    .ok_or_else(|| {
+                        AtomError::CalculationError(format!(
+                            "Invalid potential type index: {}",
+                            atom2.potential_type()
+                        ))
+                    })?;
+
+                let radius1 = pot_type1.muffin_tin_radius();
+                let radius2 = pot_type2.muffin_tin_radius();
+
+                // Use the first potential type for calculations
+                // The overlap_volume is symmetric, so it doesn't matter which one we use
+                let overlap = pot_type1.overlap_volume(atom1, atom2, radius1, radius2);
+
+                total_overlap += overlap;
+            }
+        }
+
+        Ok(total_overlap)
+    }
+
+    /// Optimize the muffin-tin radii to minimize overlap while maintaining coverage
+    pub fn optimize_muffin_tin_radii(
+        &mut self,
+        max_iterations: usize,
+        tolerance: f64,
+    ) -> Result<f64> {
+        // Calculate initial muffin-tin radii
+        self.calculate_muffin_tin_radii()?;
+
+        // Get initial overlap volume
+        let mut prev_overlap = self.calculate_total_overlap_volume()?;
+        let mut overlap_change = f64::MAX;
+
+        // Iteratively optimize
+        let mut iteration = 0;
+        while iteration < max_iterations && overlap_change > tolerance {
+            // Adjust each potential type's muffin-tin radius
+            for pot_idx in 0..self.potential_types.len() {
+                let current_radius = self.potential_types[pot_idx].muffin_tin_radius();
+
+                // Try reducing the radius to see if it improves overlap
+                let reduced_radius = current_radius * 0.95;
+                self.potential_types[pot_idx].set_muffin_tin_radius(reduced_radius);
+
+                // Calculate new overlap
+                let new_overlap = self.calculate_total_overlap_volume()?;
+
+                // If reducing made things worse, revert and try increasing
+                if new_overlap > prev_overlap {
+                    self.potential_types[pot_idx].set_muffin_tin_radius(current_radius);
+
+                    let increased_radius = current_radius * 1.05;
+                    self.potential_types[pot_idx].set_muffin_tin_radius(increased_radius);
+
+                    let new_overlap = self.calculate_total_overlap_volume()?;
+
+                    // If increasing also made things worse, revert back
+                    if new_overlap > prev_overlap {
+                        self.potential_types[pot_idx].set_muffin_tin_radius(current_radius);
+                    } else {
+                        prev_overlap = new_overlap;
+                    }
+                } else {
+                    prev_overlap = new_overlap;
+                }
+            }
+
+            // Calculate the change in overlap volume
+            let current_overlap = self.calculate_total_overlap_volume()?;
+            overlap_change = (prev_overlap - current_overlap).abs();
+            prev_overlap = current_overlap;
+
+            iteration += 1;
+        }
+
+        Ok(prev_overlap)
     }
 }
 

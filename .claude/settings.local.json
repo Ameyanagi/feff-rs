@@ -17,7 +17,15 @@
       "Bash(git push:*)",
       "Bash(uvx pre-commit:*)",
       "Bash(uvx pre-commit run:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(./target/debug/deps/more_card_types_tests-*)",
+      "Bash(--nocapture)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(RUSTFLAGS=\"-C target-cpu=native\" cargo bench simd_matrix_benchmark -- --measurement-time 10)",
+      "Bash(RUSTFLAGS=\"-C target-cpu=native\" cargo bench \"simd_matrix_benchmark\")",
+      "Bash(time cargo run --release -- --help)"
     ],
     "deny": []
   }

@@ -10,6 +10,7 @@ All rights reserved.
 
 //! Potential types used in FEFF calculations
 
+use super::atom::Atom;
 use super::database;
 use super::errors::{AtomError, Result};
 use std::fmt;
@@ -91,6 +92,20 @@ impl PotentialType {
         self.atomic_number
     }
 
+    /// Set the atomic number
+    pub fn set_atomic_number(&mut self, z: i32) -> Result<()> {
+        if z <= 0 || z > 118 {
+            return Err(AtomError::InvalidAtomicNumber(z));
+        }
+
+        self.atomic_number = z;
+        self.symbol = crate::atoms::database::element_symbol(z)
+            .unwrap_or("X")
+            .to_string();
+
+        Ok(())
+    }
+
     /// Get the element symbol
     pub fn symbol(&self) -> &str {
         &self.symbol
@@ -159,6 +174,104 @@ impl PotentialType {
     /// Get the covalent radius from the database
     pub fn covalent_radius(&self) -> Option<f64> {
         database::covalent_radius(self.atomic_number)
+    }
+
+    /// Calculate the default muffin-tin radius based on covalent radius
+    /// Returns the radius in angstroms
+    pub fn default_muffin_tin_radius(&self) -> f64 {
+        match self.covalent_radius() {
+            Some(radius) => radius * 1.2, // Scale by 1.2 as a default
+            None => 1.0,                  // Default fallback value
+        }
+    }
+
+    /// Calculate the appropriate muffin-tin radius for this potential type
+    /// Based on the distances to neighboring atoms in the structure
+    pub fn calculate_muffin_tin_radius(&self, atom: &Atom, atoms: &[Atom]) -> f64 {
+        let covalent = self.default_muffin_tin_radius();
+
+        // Find the minimum distance to any atom that's not the reference atom
+        let mut min_distance = f64::MAX;
+        for other in atoms {
+            // Skip the atom itself
+            if other.position() == atom.position() {
+                continue;
+            }
+
+            let distance = atom.distance_to(other);
+
+            // Calculate the adjusted distance based on overlap factor
+            // The overlap factor determines how much the muffin-tin spheres are allowed to overlap
+            let other_cov_radius = match database::covalent_radius(other.atomic_number()) {
+                Some(r) => r * 1.2,
+                None => 1.0,
+            };
+
+            let effective_distance = distance - other_cov_radius * self.overlap_factor;
+            if effective_distance < min_distance {
+                min_distance = effective_distance;
+            }
+        }
+
+        // If no neighboring atoms found, return the default radius
+        if min_distance == f64::MAX || min_distance <= 0.0 {
+            return covalent;
+        }
+
+        // The effective muffin-tin radius is the smaller of:
+        // 1. The default radius based on covalent radius
+        // 2. The minimum distance to a neighbor, adjusted by the overlap factor
+        f64::min(covalent, min_distance * self.overlap_factor)
+    }
+
+    /// Calculate muffin-tin radii for all atoms of this potential type
+    /// This updates the muffin-tin radius for this potential type
+    pub fn calculate_optimal_muffin_tin_radius(
+        &mut self,
+        atoms_of_this_type: &[&Atom],
+        all_atoms: &[Atom],
+    ) -> Result<f64> {
+        if atoms_of_this_type.is_empty() {
+            return Err(AtomError::CalculationError(
+                "Cannot calculate muffin-tin radius without atoms".to_string(),
+            ));
+        }
+
+        // Calculate the radius for each atom of this type
+        let mut radii = Vec::with_capacity(atoms_of_this_type.len());
+        for atom in atoms_of_this_type {
+            radii.push(self.calculate_muffin_tin_radius(atom, all_atoms));
+        }
+
+        // Use the average radius as the optimal value
+        let avg_radius = radii.iter().sum::<f64>() / radii.len() as f64;
+        self.muffin_tin_radius = avg_radius;
+
+        Ok(avg_radius)
+    }
+
+    /// Calculate the overlap volume between two muffin-tin spheres
+    /// Returns the volume in cubic angstroms
+    pub fn overlap_volume(&self, atom1: &Atom, atom2: &Atom, radius1: f64, radius2: f64) -> f64 {
+        let d = atom1.distance_to(atom2);
+
+        // If spheres don't overlap, return 0
+        if d >= radius1 + radius2 {
+            return 0.0;
+        }
+
+        // If one sphere is contained within the other, return volume of the smaller sphere
+        if d <= (radius1 - radius2).abs() {
+            let smaller_radius = f64::min(radius1, radius2);
+            return (4.0 / 3.0) * std::f64::consts::PI * smaller_radius.powi(3);
+        }
+
+        // Calculate the volume of the lens-shaped intersection
+        // Formula: V = (pi/12d) * (r1 + r2 - d)^2 * (d^2 + 2d(r1 + r2) - 3(r1 - r2)^2)
+        let term1 = (radius1 + radius2 - d).powi(2);
+        let term2 = d.powi(2) + 2.0 * d * (radius1 + radius2) - 3.0 * (radius1 - radius2).powi(2);
+
+        (std::f64::consts::PI / (12.0 * d)) * term1 * term2
     }
 }
 

@@ -1,0 +1,13 @@
+TITLE Test for new cards
+
+ATOMS
+0 0.0 0.0 0.0 Fe
+1 1.0 1.0 1.0 O
+
+RESTART pot saved_pot.bin
+DOS -30.0 30.0 0.2 0.4 1.0 2.0
+CIFS structure.cif 2 8.0
+
+POTENTIALS
+0 26 Fe
+1 8 O

@@ -30,6 +30,15 @@ pub enum AtomError {
 
     #[error("Parse error: {0}")]
     ParseError(String),
+
+    #[error("Invalid structure: {0}")]
+    InvalidStructure(String),
+
+    #[error("Invalid edge type: {0}")]
+    InvalidEdge(String),
+
+    #[error("Potential error: {0}")]
+    PotentialError(String),
 }
 
 /// Result type for atom operations

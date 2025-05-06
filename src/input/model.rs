@@ -101,6 +101,39 @@ pub struct FeffInput {
     /// OPCONS card parameters
     pub opcons: Option<OpConsParams>,
 
+    /// TDLDA card parameters
+    pub tdlda: Option<TdldaParams>,
+
+    /// MULTIPOLE card parameters
+    pub multipole: Option<MultipoleParams>,
+
+    /// SCREEN card parameters
+    pub screen: Option<ScreenParams>,
+
+    /// SPECTRAL card parameters
+    pub spectral: Option<SpectralParams>,
+
+    /// DIMENSIONS card parameters
+    pub dimensions: Option<DimensionsParams>,
+
+    /// RDINP card parameters
+    pub rdinp: Option<RdinpParams>,
+
+    /// BANDSTRUCTURE card parameters
+    pub bandstructure: Option<BandstructureParams>,
+
+    /// KMESH card parameters
+    pub kmesh: Option<KmeshParams>,
+
+    /// RESTART card parameters
+    pub restart: Option<RestartParams>,
+
+    /// DOS card parameters
+    pub dos: Option<DosParams>,
+
+    /// CIFS card parameters
+    pub cifs: Option<CifsParams>,
+
     /// Unknown cards
     pub unknown_cards: Vec<Card>,
 }
@@ -406,6 +439,134 @@ impl FeffInput {
                 writeln!(writer, "OPCONS").map_err(InputError::IoError)?;
                 writeln!(writer).map_err(InputError::IoError)?;
             }
+        }
+
+        // Write TDLDA card if available
+        if let Some(tdlda) = &self.tdlda {
+            writeln!(
+                writer,
+                "TDLDA {} {} {} {} {} {}",
+                tdlda.iscreen, tdlda.icalc, tdlda.elow, tdlda.ehigh, tdlda.estep, tdlda.gamma
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write MULTIPOLE card if available
+        if let Some(multipole) = &self.multipole {
+            writeln!(
+                writer,
+                "MULTIPOLE {} {} {}",
+                multipole.lmax, multipole.morder, multipole.tensor
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write SCREEN card if available
+        if let Some(screen) = &self.screen {
+            writeln!(
+                writer,
+                "SCREEN {} {} {} {}",
+                screen.iself, screen.iscreen, screen.ca1, screen.ci1
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write SPECTRAL card if available
+        if let Some(spectral) = &self.spectral {
+            writeln!(
+                writer,
+                "SPECTRAL {} {} {} {} {} {}",
+                spectral.ispect,
+                spectral.ispsharp,
+                spectral.isprule,
+                spectral.emin,
+                spectral.emax,
+                spectral.estep
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write DIMENSIONS card if available
+        if let Some(dimensions) = &self.dimensions {
+            writeln!(
+                writer,
+                "DIMENSIONS {} {} {} {} {}",
+                dimensions.nat, dimensions.nph, dimensions.lx, dimensions.npot, dimensions.nstat
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write RDINP card if available
+        if let Some(rdinp) = &self.rdinp {
+            writeln!(writer, "RDINP {}", rdinp.file_name).map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write BANDSTRUCTURE card if available
+        if let Some(bandstructure) = &self.bandstructure {
+            writeln!(
+                writer,
+                "BANDSTRUCTURE {} {} {} {} {} {}",
+                bandstructure.nk,
+                bandstructure.emin,
+                bandstructure.emax,
+                bandstructure.estep,
+                bandstructure.kmesh,
+                bandstructure.symmetry
+            )
+            .map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write KMESH card if available
+        if let Some(kmesh) = &self.kmesh {
+            writeln!(writer, "KMESH {} {} {}", kmesh.nx, kmesh.ny, kmesh.nz)
+                .map_err(InputError::IoError)?;
+
+            // Write explicit k-points if defined
+            for (kx, ky, kz) in &kmesh.kpoints {
+                writeln!(writer, "{} {} {}", kx, ky, kz).map_err(InputError::IoError)?;
+            }
+
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write RESTART card if available
+        if let Some(restart) = &self.restart {
+            let mut line = format!("RESTART {}", restart.module);
+            if let Some(file_name) = &restart.file_name {
+                line.push_str(&format!(" {}", file_name));
+            }
+            writeln!(writer, "{}", line).map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write DOS card if available
+        if let Some(dos) = &self.dos {
+            let mut line = format!("DOS {} {} {} {}", dos.emin, dos.emax, dos.estep, dos.gamma);
+            for param in &dos.params {
+                line.push_str(&format!(" {}", param));
+            }
+            writeln!(writer, "{}", line).map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
+        }
+
+        // Write CIFS card if available
+        if let Some(cifs) = &self.cifs {
+            let mut line = format!("CIFS {}", cifs.file_name);
+            if let Some(site_index) = cifs.site_index {
+                line.push_str(&format!(" {}", site_index));
+                if let Some(distance_cutoff) = cifs.distance_cutoff {
+                    line.push_str(&format!(" {}", distance_cutoff));
+                }
+            }
+            writeln!(writer, "{}", line).map_err(InputError::IoError)?;
+            writeln!(writer).map_err(InputError::IoError)?;
         }
 
         // Write POTENTIALS card

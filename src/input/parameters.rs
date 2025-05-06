@@ -280,3 +280,148 @@ pub struct OpConsParams {
     /// Flag indicating that the OPCONS card is present
     pub enabled: bool,
 }
+
+/// TDLDA card parameters for time-dependent local density approximation
+#[derive(Debug, Clone, Default)]
+pub struct TdldaParams {
+    /// Screening flag: 0=RPA, 1=TDA, 2=TDLDA
+    pub iscreen: i32,
+    /// Calculation flag: 0/1=SCF+XAS, 2=store matrix, 3=non-SCF from stored
+    pub icalc: i32,
+    /// Energy range below absorption edge (in eV)
+    pub elow: f64,
+    /// Energy range above absorption edge (in eV)
+    pub ehigh: f64,
+    /// Energy step (in eV)
+    pub estep: f64,
+    /// Broadening parameter (in eV)
+    pub gamma: f64,
+}
+
+/// MULTIPOLE card parameters for multipole transitions
+#[derive(Debug, Clone, Default)]
+pub struct MultipoleParams {
+    /// Maximum orbital angular momentum (l) for the final state
+    pub lmax: i32,
+    /// Highest order multipole calculated (1=dipole, 2=quadrupole, etc.)
+    pub morder: i32,
+    /// Enable spherical tensor calculation (0=no, 1=yes)
+    pub tensor: i32,
+}
+
+/// SCREEN card parameters for self-energy corrections to core-hole screening
+#[derive(Debug, Clone, Default)]
+pub struct ScreenParams {
+    /// Self-energy scheme (0=none, 1=HL, 2=DH)
+    pub iself: i32,
+    /// Core hole screening mode (0=unscreened, 1=screened, 2=partially screened)
+    pub iscreen: i32,
+    /// Self-energy real part pre-factor
+    pub ca1: f64,
+    /// Self-energy imaginary part pre-factor
+    pub ci1: f64,
+}
+
+/// SPECTRAL card parameters for spectral function convolution
+#[derive(Debug, Clone, Default)]
+pub struct SpectralParams {
+    /// Apply spectral convolution (0=no, 1=yes)
+    pub ispect: i32,
+    /// Sharpen spectra (0=no, 1=yes)
+    pub ispsharp: i32,
+    /// Parameter for Fermi level determination
+    pub isprule: i32,
+    /// Spectral energy range below Fermi level in eV
+    pub emin: f64,
+    /// Spectral energy range above Fermi level in eV  
+    pub emax: f64,
+    /// Energy grid spacing for spectral function in eV
+    pub estep: f64,
+}
+
+/// DIMENSIONS card parameters for array dimensioning
+#[derive(Debug, Clone, Default)]
+pub struct DimensionsParams {
+    /// Maximum l quantum number for waves and phase shifts
+    pub nat: i32,
+    /// Maximum atomic sites
+    pub nph: i32,
+    /// Maximum number of r-mesh points for potentials
+    pub lx: i32,
+    /// Maximum number of unique potentials
+    pub npot: i32,
+    /// Maximum number of paths
+    pub nstat: i32,
+}
+
+/// RDINP card parameters for reading input from a different file
+#[derive(Debug, Clone, Default)]
+pub struct RdinpParams {
+    /// File name to read input from
+    pub file_name: String,
+}
+
+/// BANDSTRUCTURE card parameters for band structure calculations
+#[derive(Debug, Clone, Default)]
+pub struct BandstructureParams {
+    /// Number of k-points
+    pub nk: i32,
+    /// Minimum energy relative to Fermi level (eV)
+    pub emin: f64,
+    /// Maximum energy relative to Fermi level (eV)
+    pub emax: f64,
+    /// Energy step (eV)
+    pub estep: f64,
+    /// k-point mesh flag (0=user-defined, 1=uniform)
+    pub kmesh: i32,
+    /// Symmetry flag (0=no symmetry, 1=use symmetry)
+    pub symmetry: i32,
+}
+
+/// KMESH card parameters for k-space mesh in band structure calculations
+#[derive(Debug, Clone, Default)]
+pub struct KmeshParams {
+    /// Number of k-points in x direction
+    pub nx: i32,
+    /// Number of k-points in y direction
+    pub ny: i32,
+    /// Number of k-points in z direction
+    pub nz: i32,
+    /// K-points defined explicitly in content
+    pub kpoints: Vec<(f64, f64, f64)>,
+}
+
+/// RESTART card parameters for restarting from saved files
+#[derive(Debug, Clone, Default)]
+pub struct RestartParams {
+    /// The module to restart from (e.g., "pot", "phase", "fms", etc.)
+    pub module: String,
+    /// Additional file name if needed
+    pub file_name: Option<String>,
+}
+
+/// DOS card parameters for density of states calculations
+#[derive(Debug, Clone, Default)]
+pub struct DosParams {
+    /// Lower energy bound in eV
+    pub emin: f64,
+    /// Upper energy bound in eV
+    pub emax: f64,
+    /// Energy step in eV
+    pub estep: f64,
+    /// Gaussian broadening in eV
+    pub gamma: f64,
+    /// Additional DOS calculation parameters
+    pub params: Vec<f64>,
+}
+
+/// CIFS card parameters for crystallographic information
+#[derive(Debug, Clone, Default)]
+pub struct CifsParams {
+    /// File name for CIF (Crystallographic Information File)
+    pub file_name: String,
+    /// Site number for the absorbing atom
+    pub site_index: Option<i32>,
+    /// Distance cutoff for cluster construction
+    pub distance_cutoff: Option<f64>,
+}

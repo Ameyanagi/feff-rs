@@ -15,8 +15,14 @@ All rights reserved.
 pub mod constants;
 pub mod conversions;
 pub mod errors;
+pub mod linear_algebra;
+pub mod math;
+pub mod matrix;
 
 // Re-export commonly used types and functions for convenience
 pub use constants::*;
 pub use conversions::*;
 pub use errors::{Result, UtilsError};
+pub use linear_algebra::*;
+pub use math::*;
+pub use matrix::*;

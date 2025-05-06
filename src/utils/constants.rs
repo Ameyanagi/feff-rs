@@ -16,6 +16,12 @@ pub const SPEED_OF_LIGHT: f64 = 137.036;
 /// Bohr radius in Angstroms
 pub const BOHR_RADIUS: f64 = 0.529177;
 
+/// Conversion from Bohr to Angstroms
+pub const BOHR_TO_ANGSTROM: f64 = BOHR_RADIUS;
+
+/// Conversion from Angstroms to Bohr
+pub const ANGSTROM_TO_BOHR: f64 = 1.0 / BOHR_RADIUS;
+
 /// Rydberg energy in eV
 pub const RYDBERG: f64 = 13.6057;
 

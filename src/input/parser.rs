@@ -87,6 +87,17 @@ impl FeffInputParser {
                 "NRIXS" => self.parse_nrixs_card(card, &mut feff_input)?,
                 "ELLIPTICITY" => self.parse_ellipticity_card(card, &mut feff_input)?,
                 "OPCONS" => self.parse_opcons_card(card, &mut feff_input)?,
+                "TDLDA" => self.parse_tdlda_card(card, &mut feff_input)?,
+                "MULTIPOLE" => self.parse_multipole_card(card, &mut feff_input)?,
+                "SCREEN" => self.parse_screen_card(card, &mut feff_input)?,
+                "SPECTRAL" => self.parse_spectral_card(card, &mut feff_input)?,
+                "DIMENSIONS" => self.parse_dimensions_card(card, &mut feff_input)?,
+                "RDINP" => self.parse_rdinp_card(card, &mut feff_input)?,
+                "BANDSTRUCTURE" => self.parse_bandstructure_card(card, &mut feff_input)?,
+                "KMESH" => self.parse_kmesh_card(card, &mut feff_input)?,
+                "RESTART" => self.parse_restart_card(card, &mut feff_input)?,
+                "DOS" => self.parse_dos_card(card, &mut feff_input)?,
+                "CIFS" => self.parse_cifs_card(card, &mut feff_input)?,
                 // Unknown card, store it for future reference
                 _ => {
                     feff_input.unknown_cards.push(card.clone());
@@ -1360,6 +1371,750 @@ impl FeffInputParser {
         let opcons = OpConsParams { enabled: true };
 
         input.opcons = Some(opcons);
+        Ok(())
+    }
+
+    /// Parse TDLDA card - time-dependent local density approximation parameters
+    fn parse_tdlda_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        // Default parameters
+        let mut tdlda = TdldaParams {
+            iscreen: 2,  // Default to TDLDA (2)
+            icalc: 0,    // Default to SCF+XAS (0)
+            elow: -20.0, // Default to -20 eV below edge
+            ehigh: 30.0, // Default to 30 eV above edge
+            estep: 0.1,  // Default step size 0.1 eV
+            gamma: 0.1,  // Default broadening 0.1 eV
+        };
+
+        if card.content.is_empty() {
+            input.tdlda = Some(tdlda);
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: TDLDA iscreen icalc elow ehigh estep gamma
+
+        // Parse provided parameters
+        if !fields.is_empty() {
+            tdlda.iscreen = fields[0].parse().unwrap_or(2);
+        }
+
+        if fields.len() > 1 {
+            tdlda.icalc = fields[1].parse().unwrap_or(0);
+        }
+
+        if fields.len() > 2 {
+            tdlda.elow = fields[2].parse().unwrap_or(-20.0);
+        }
+
+        if fields.len() > 3 {
+            tdlda.ehigh = fields[3].parse().unwrap_or(30.0);
+        }
+
+        if fields.len() > 4 {
+            tdlda.estep = fields[4].parse().unwrap_or(0.1);
+        }
+
+        if fields.len() > 5 {
+            tdlda.gamma = fields[5].parse().unwrap_or(0.1);
+        }
+
+        // Validate parameters
+        if tdlda.iscreen < 0 || tdlda.iscreen > 2 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid iscreen value: {}. Must be 0 (RPA), 1 (TDA), or 2 (TDLDA)",
+                tdlda.iscreen
+            )));
+        }
+
+        if tdlda.icalc < 0 || tdlda.icalc > 3 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid icalc value: {}. Must be between 0 and 3",
+                tdlda.icalc
+            )));
+        }
+
+        if tdlda.estep <= 0.0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid energy step: {}. Must be positive",
+                tdlda.estep
+            )));
+        }
+
+        if tdlda.gamma <= 0.0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid gamma value: {}. Must be positive",
+                tdlda.gamma
+            )));
+        }
+
+        input.tdlda = Some(tdlda);
+        Ok(())
+    }
+
+    /// Parse MULTIPOLE card - multipole transitions parameters
+    fn parse_multipole_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        // Default parameters
+        let mut multipole = MultipoleParams {
+            lmax: 3,   // Default maximum l
+            morder: 2, // Default to quadrupole
+            tensor: 0, // Default tensor off
+        };
+
+        if card.content.is_empty() {
+            input.multipole = Some(multipole);
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: MULTIPOLE lmax morder tensor
+
+        // Parse provided parameters
+        if !fields.is_empty() {
+            multipole.lmax = fields[0].parse().unwrap_or(3);
+        }
+
+        if fields.len() > 1 {
+            multipole.morder = fields[1].parse().unwrap_or(2);
+        }
+
+        if fields.len() > 2 {
+            multipole.tensor = fields[2].parse().unwrap_or(0);
+        }
+
+        // Validate parameters
+        if multipole.lmax < 1 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid lmax value: {}. Must be positive",
+                multipole.lmax
+            )));
+        }
+
+        if multipole.morder < 1 || multipole.morder > 4 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid morder value: {}. Must be between 1 and 4",
+                multipole.morder
+            )));
+        }
+
+        if multipole.tensor != 0 && multipole.tensor != 1 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid tensor value: {}. Must be 0 or 1",
+                multipole.tensor
+            )));
+        }
+
+        input.multipole = Some(multipole);
+        Ok(())
+    }
+
+    /// Parse SCREEN card - self-energy corrections parameters
+    fn parse_screen_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        // Default parameters
+        let mut screen = ScreenParams {
+            iself: 1,   // Default to HL scheme
+            iscreen: 1, // Default to screened
+            ca1: 1.0,   // Default real part prefactor
+            ci1: 1.0,   // Default imaginary part prefactor
+        };
+
+        if card.content.is_empty() {
+            input.screen = Some(screen);
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: SCREEN iself iscreen ca1 ci1
+
+        // Parse provided parameters
+        if !fields.is_empty() {
+            screen.iself = fields[0].parse().unwrap_or(1);
+        }
+
+        if fields.len() > 1 {
+            screen.iscreen = fields[1].parse().unwrap_or(1);
+        }
+
+        if fields.len() > 2 {
+            screen.ca1 = fields[2].parse().unwrap_or(1.0);
+        }
+
+        if fields.len() > 3 {
+            screen.ci1 = fields[3].parse().unwrap_or(1.0);
+        }
+
+        // Validate parameters
+        if screen.iself < 0 || screen.iself > 2 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid iself value: {}. Must be 0 (none), 1 (HL), or 2 (DH)",
+                screen.iself
+            )));
+        }
+
+        if screen.iscreen < 0 || screen.iscreen > 2 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid iscreen value: {}. Must be 0 (unscreened), 1 (screened), or 2 (partial)",
+                screen.iscreen
+            )));
+        }
+
+        input.screen = Some(screen);
+        Ok(())
+    }
+
+    /// Parse SPECTRAL card - spectral function convolution parameters
+    fn parse_spectral_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        // Default parameters
+        let mut spectral = SpectralParams {
+            ispect: 1,   // Default to enabled
+            ispsharp: 0, // Default sharpening off
+            isprule: 0,  // Default Fermi level determination method
+            emin: -20.0, // Default range below Fermi level
+            emax: 20.0,  // Default range above Fermi level
+            estep: 0.1,  // Default energy grid spacing
+        };
+
+        if card.content.is_empty() {
+            input.spectral = Some(spectral);
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: SPECTRAL ispect ispsharp isprule emin emax estep
+
+        // Parse provided parameters
+        if !fields.is_empty() {
+            spectral.ispect = fields[0].parse().unwrap_or(1);
+        }
+
+        if fields.len() > 1 {
+            spectral.ispsharp = fields[1].parse().unwrap_or(0);
+        }
+
+        if fields.len() > 2 {
+            spectral.isprule = fields[2].parse().unwrap_or(0);
+        }
+
+        if fields.len() > 3 {
+            spectral.emin = fields[3].parse().unwrap_or(-20.0);
+        }
+
+        if fields.len() > 4 {
+            spectral.emax = fields[4].parse().unwrap_or(20.0);
+        }
+
+        if fields.len() > 5 {
+            spectral.estep = fields[5].parse().unwrap_or(0.1);
+        }
+
+        // Validate parameters
+        if spectral.ispect != 0 && spectral.ispect != 1 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid ispect value: {}. Must be 0 (no) or 1 (yes)",
+                spectral.ispect
+            )));
+        }
+
+        if spectral.ispsharp != 0 && spectral.ispsharp != 1 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid ispsharp value: {}. Must be 0 (no) or 1 (yes)",
+                spectral.ispsharp
+            )));
+        }
+
+        if spectral.estep <= 0.0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid energy step: {}. Must be positive",
+                spectral.estep
+            )));
+        }
+
+        input.spectral = Some(spectral);
+        Ok(())
+    }
+
+    /// Parse DIMENSIONS card - array dimensioning parameters
+    fn parse_dimensions_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        // Default parameters
+        let mut dimensions = DimensionsParams {
+            nat: 15,    // Default maximum l quantum number
+            nph: 200,   // Default maximum atomic sites
+            lx: 200,    // Default maximum r-mesh points
+            npot: 8,    // Default maximum unique potentials
+            nstat: 500, // Default maximum number of paths
+        };
+
+        if card.content.is_empty() {
+            input.dimensions = Some(dimensions);
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: DIMENSIONS nat nph lx npot nstat
+
+        // Parse provided parameters
+        if !fields.is_empty() {
+            dimensions.nat = fields[0].parse().unwrap_or(15);
+        }
+
+        if fields.len() > 1 {
+            dimensions.nph = fields[1].parse().unwrap_or(200);
+        }
+
+        if fields.len() > 2 {
+            dimensions.lx = fields[2].parse().unwrap_or(200);
+        }
+
+        if fields.len() > 3 {
+            dimensions.npot = fields[3].parse().unwrap_or(8);
+        }
+
+        if fields.len() > 4 {
+            dimensions.nstat = fields[4].parse().unwrap_or(500);
+        }
+
+        // Validate parameters
+        if dimensions.nat <= 0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid nat value: {}. Must be positive",
+                dimensions.nat
+            )));
+        }
+
+        if dimensions.nph <= 0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid nph value: {}. Must be positive",
+                dimensions.nph
+            )));
+        }
+
+        if dimensions.lx <= 0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid lx value: {}. Must be positive",
+                dimensions.lx
+            )));
+        }
+
+        if dimensions.npot <= 0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid npot value: {}. Must be positive",
+                dimensions.npot
+            )));
+        }
+
+        if dimensions.nstat <= 0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid nstat value: {}. Must be positive",
+                dimensions.nstat
+            )));
+        }
+
+        input.dimensions = Some(dimensions);
+        Ok(())
+    }
+
+    /// Parse RDINP card - read input from a different file
+    fn parse_rdinp_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        if card.content.is_empty() {
+            return Err(InputError::ParseError(
+                "RDINP card requires a file name".to_string(),
+            ));
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: RDINP filename
+        if fields.is_empty() {
+            return Err(InputError::ParseError(
+                "RDINP card requires a file name".to_string(),
+            ));
+        }
+
+        // Get the filename
+        let file_name = fields[0].to_string();
+
+        // Basic validation
+        if file_name.is_empty() {
+            return Err(InputError::InvalidFormat(
+                "RDINP filename cannot be empty".to_string(),
+            ));
+        }
+
+        let rdinp = RdinpParams { file_name };
+        input.rdinp = Some(rdinp);
+        Ok(())
+    }
+
+    /// Parse BANDSTRUCTURE card - band structure calculation parameters
+    fn parse_bandstructure_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        // Default parameters
+        let mut bandstructure = BandstructureParams {
+            nk: 100,     // Default number of k-points
+            emin: -10.0, // Default minimum energy
+            emax: 10.0,  // Default maximum energy
+            estep: 0.1,  // Default energy step
+            kmesh: 1,    // Default to uniform mesh
+            symmetry: 1, // Default to use symmetry
+        };
+
+        // If card has no content, use defaults
+        if card.content.is_empty() {
+            input.bandstructure = Some(bandstructure);
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: BANDSTRUCTURE nk emin emax estep kmesh symmetry
+
+        // Parse provided parameters
+        if !fields.is_empty() {
+            bandstructure.nk = fields[0].parse().unwrap_or(100);
+        }
+
+        if fields.len() > 1 {
+            bandstructure.emin = fields[1].parse().unwrap_or(-10.0);
+        }
+
+        if fields.len() > 2 {
+            bandstructure.emax = fields[2].parse().unwrap_or(10.0);
+        }
+
+        if fields.len() > 3 {
+            bandstructure.estep = fields[3].parse().unwrap_or(0.1);
+        }
+
+        if fields.len() > 4 {
+            bandstructure.kmesh = fields[4].parse().unwrap_or(1);
+        }
+
+        if fields.len() > 5 {
+            bandstructure.symmetry = fields[5].parse().unwrap_or(1);
+        }
+
+        // Validate parameters
+        if bandstructure.nk <= 0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid number of k-points: {}. Must be positive",
+                bandstructure.nk
+            )));
+        }
+
+        if bandstructure.emax <= bandstructure.emin {
+            return Err(InputError::InvalidFormat(format!(
+                "Maximum energy ({}) must be greater than minimum energy ({})",
+                bandstructure.emax, bandstructure.emin
+            )));
+        }
+
+        if bandstructure.estep <= 0.0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Energy step ({}) must be positive",
+                bandstructure.estep
+            )));
+        }
+
+        if bandstructure.kmesh != 0 && bandstructure.kmesh != 1 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid kmesh flag: {}. Must be 0 (user-defined) or 1 (uniform)",
+                bandstructure.kmesh
+            )));
+        }
+
+        if bandstructure.symmetry != 0 && bandstructure.symmetry != 1 {
+            return Err(InputError::InvalidFormat(format!(
+                "Invalid symmetry flag: {}. Must be 0 (no symmetry) or 1 (use symmetry)",
+                bandstructure.symmetry
+            )));
+        }
+
+        input.bandstructure = Some(bandstructure);
+        Ok(())
+    }
+
+    /// Parse KMESH card - k-space mesh for band structure calculations
+    fn parse_kmesh_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        // Default parameters
+        let mut kmesh = KmeshParams {
+            nx: 10,              // Default x-direction points
+            ny: 10,              // Default y-direction points
+            nz: 10,              // Default z-direction points
+            kpoints: Vec::new(), // Empty list of explicit k-points
+        };
+
+        // KMESH card requires at least one line
+        if card.content.is_empty() {
+            return Err(InputError::ParseError(
+                "KMESH card requires parameters".to_string(),
+            ));
+        }
+
+        let first_line = card.content[0].trim();
+        let first_fields: Vec<&str> = first_line.split_whitespace().collect();
+
+        // Format (first line): KMESH nx ny nz
+        if first_fields.len() < 3 {
+            return Err(InputError::ParseError(
+                "KMESH card requires at least nx, ny, nz parameters".to_string(),
+            ));
+        }
+
+        // Parse mesh dimensions
+        kmesh.nx = first_fields[0].parse().map_err(|_| {
+            InputError::ParseError(format!("Invalid nx value: {}", first_fields[0]))
+        })?;
+
+        kmesh.ny = first_fields[1].parse().map_err(|_| {
+            InputError::ParseError(format!("Invalid ny value: {}", first_fields[1]))
+        })?;
+
+        kmesh.nz = first_fields[2].parse().map_err(|_| {
+            InputError::ParseError(format!("Invalid nz value: {}", first_fields[2]))
+        })?;
+
+        // Validate mesh dimensions
+        if kmesh.nx <= 0 || kmesh.ny <= 0 || kmesh.nz <= 0 {
+            return Err(InputError::InvalidFormat(
+                "Mesh dimensions must be positive".to_string(),
+            ));
+        }
+
+        // If there are more lines, parse explicit k-points
+        for i in 1..card.content.len() {
+            let line = card.content[i].trim();
+
+            // Skip comment lines and empty lines
+            if line.starts_with('*') || line.starts_with('#') || line.is_empty() {
+                continue;
+            }
+
+            let fields: Vec<&str> = line.split_whitespace().collect();
+
+            // Each k-point needs 3 coordinates
+            if fields.len() < 3 {
+                return Err(InputError::ParseError(format!(
+                    "K-point at line {} needs 3 coordinates",
+                    card.line_number + i
+                )));
+            }
+
+            // Parse coordinates
+            let kx = fields[0]
+                .parse::<f64>()
+                .map_err(|_| InputError::ParseError(format!("Invalid kx value: {}", fields[0])))?;
+
+            let ky = fields[1]
+                .parse::<f64>()
+                .map_err(|_| InputError::ParseError(format!("Invalid ky value: {}", fields[1])))?;
+
+            let kz = fields[2]
+                .parse::<f64>()
+                .map_err(|_| InputError::ParseError(format!("Invalid kz value: {}", fields[2])))?;
+
+            // Add to list of k-points
+            kmesh.kpoints.push((kx, ky, kz));
+        }
+
+        input.kmesh = Some(kmesh);
+        Ok(())
+    }
+
+    /// Parse RESTART card - load saved calculation results
+    fn parse_restart_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        if card.content.is_empty() {
+            return Err(InputError::ParseError(
+                "RESTART card requires a module name".to_string(),
+            ));
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: RESTART module [file_name]
+        if fields.is_empty() {
+            return Err(InputError::ParseError(
+                "RESTART card requires a module name".to_string(),
+            ));
+        }
+
+        // Get the module name
+        let module = fields[0].to_string();
+
+        // Basic validation
+        if module.is_empty() {
+            return Err(InputError::InvalidFormat(
+                "RESTART module name cannot be empty".to_string(),
+            ));
+        }
+
+        // Get optional file name
+        let file_name = if fields.len() > 1 {
+            Some(fields[1].to_string())
+        } else {
+            None
+        };
+
+        let restart = RestartParams { module, file_name };
+        input.restart = Some(restart);
+        Ok(())
+    }
+
+    /// Parse DOS card - density of states calculation parameters
+    fn parse_dos_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        // Default parameters
+        let mut dos = DosParams {
+            emin: -20.0,        // Default minimum energy
+            emax: 20.0,         // Default maximum energy
+            estep: 0.1,         // Default energy step
+            gamma: 0.2,         // Default broadening
+            params: Vec::new(), // Default empty additional parameters
+        };
+
+        if card.content.is_empty() {
+            input.dos = Some(dos);
+            return Ok(());
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: DOS emin emax estep gamma [additional_params...]
+
+        // Parse provided parameters
+        if !fields.is_empty() {
+            dos.emin = fields[0].parse().unwrap_or(-20.0);
+        }
+
+        if fields.len() > 1 {
+            dos.emax = fields[1].parse().unwrap_or(20.0);
+        }
+
+        if fields.len() > 2 {
+            dos.estep = fields[2].parse().unwrap_or(0.1);
+        }
+
+        if fields.len() > 3 {
+            dos.gamma = fields[3].parse().unwrap_or(0.2);
+        }
+
+        // Parse any additional parameters
+        for field in fields.iter().skip(4) {
+            if let Ok(param) = field.parse::<f64>() {
+                dos.params.push(param);
+            }
+        }
+
+        // Validate parameters
+        if dos.emax <= dos.emin {
+            return Err(InputError::InvalidFormat(format!(
+                "Maximum energy ({}) must be greater than minimum energy ({})",
+                dos.emax, dos.emin
+            )));
+        }
+
+        if dos.estep <= 0.0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Energy step ({}) must be positive",
+                dos.estep
+            )));
+        }
+
+        if dos.gamma < 0.0 {
+            return Err(InputError::InvalidFormat(format!(
+                "Broadening parameter ({}) cannot be negative",
+                dos.gamma
+            )));
+        }
+
+        input.dos = Some(dos);
+        Ok(())
+    }
+
+    /// Parse CIFS card - crystallographic information file
+    fn parse_cifs_card(&self, card: &Card, input: &mut FeffInput) -> Result<()> {
+        if card.content.is_empty() {
+            return Err(InputError::ParseError(
+                "CIFS card requires a file name".to_string(),
+            ));
+        }
+
+        let line = card.content[0].trim();
+        let fields: Vec<&str> = line.split_whitespace().collect();
+
+        // Format: CIFS file_name [site_index [distance_cutoff]]
+        if fields.is_empty() {
+            return Err(InputError::ParseError(
+                "CIFS card requires a file name".to_string(),
+            ));
+        }
+
+        // Get the filename
+        let file_name = fields[0].to_string();
+
+        // Basic validation
+        if file_name.is_empty() {
+            return Err(InputError::InvalidFormat(
+                "CIFS filename cannot be empty".to_string(),
+            ));
+        }
+
+        // Parse optional site index
+        let site_index = if fields.len() > 1 {
+            match fields[1].parse::<i32>() {
+                Ok(index) => Some(index),
+                Err(_) => {
+                    return Err(InputError::ParseError(format!(
+                        "Invalid site index: {}",
+                        fields[1]
+                    )))
+                }
+            }
+        } else {
+            None
+        };
+
+        // Parse optional distance cutoff
+        let distance_cutoff = if fields.len() > 2 {
+            match fields[2].parse::<f64>() {
+                Ok(cutoff) => {
+                    if cutoff <= 0.0 {
+                        return Err(InputError::InvalidFormat(format!(
+                            "Distance cutoff must be positive, found: {}",
+                            cutoff
+                        )));
+                    }
+                    Some(cutoff)
+                }
+                Err(_) => {
+                    return Err(InputError::ParseError(format!(
+                        "Invalid distance cutoff: {}",
+                        fields[2]
+                    )))
+                }
+            }
+        } else {
+            None
+        };
+
+        let cifs = CifsParams {
+            file_name,
+            site_index,
+            distance_cutoff,
+        };
+
+        input.cifs = Some(cifs);
         Ok(())
     }
 }
