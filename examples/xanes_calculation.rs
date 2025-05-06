@@ -62,6 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         gaussian_broadening: 1.0,                     // Additional Gaussian broadening (eV)
         lorentzian_broadening: 0.5,                   // Additional Lorentzian broadening (eV)
         energy_dependent_broadening: 0.1,             // Energy-dependent broadening factor
+        thermal_parameters: None,                     // No thermal effects
         include_quadrupole: true,                     // Include quadrupole transitions
         max_l: 3,                                     // Maximum angular momentum
         core_hole_method: CoreHoleMethod::FinalState, // Use final state rule

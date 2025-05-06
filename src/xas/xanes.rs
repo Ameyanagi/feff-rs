@@ -236,6 +236,8 @@ pub struct XanesParameters {
     pub core_hole_method: CoreHoleMethod,
     /// Core-hole screening parameter (0.0 to 1.0)
     pub core_hole_screening: f64,
+    /// Thermal parameters for temperature-dependent calculations
+    pub thermal_parameters: Option<crate::xas::thermal::ThermalParameters>,
 }
 
 impl Default for XanesParameters {
@@ -254,6 +256,7 @@ impl Default for XanesParameters {
             max_l: 3,
             core_hole_method: CoreHoleMethod::FinalState,
             core_hole_screening: 0.0,
+            thermal_parameters: None, // No thermal effects by default
         }
     }
 }

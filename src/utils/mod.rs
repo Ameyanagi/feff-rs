@@ -18,6 +18,7 @@ pub mod errors;
 pub mod linear_algebra;
 pub mod math;
 pub mod matrix;
+pub mod thermal;
 
 // Re-export commonly used types and functions for convenience
 pub use constants::*;
@@ -26,3 +27,4 @@ pub use errors::{Result, UtilsError};
 pub use linear_algebra::*;
 pub use math::*;
 pub use matrix::*;
+pub use thermal::{create_thermal_model, DebyeModel, EinsteinModel, ThermalModel};

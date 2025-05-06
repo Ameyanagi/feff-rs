@@ -13,7 +13,6 @@ All rights reserved.
 use approx::assert_relative_eq;
 use feff_rs::atoms::{Atom, AtomicStructure, PotentialType, Vector3D};
 use feff_rs::potential::{GridType, MixingMethod, MuffinTinPotential};
-use std::f64::consts::PI;
 
 /// Test fixture for setting up a common testing environment
 fn setup_iron_atom() -> AtomicStructure {

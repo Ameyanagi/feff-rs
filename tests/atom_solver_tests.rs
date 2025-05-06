@@ -11,7 +11,7 @@ All rights reserved.
 //! Tests for the atomic solver implementation
 
 use approx::assert_relative_eq;
-use feff_rs::potential::{AtomSolver, AtomSolverConfig, RadialWavefunction};
+use feff_rs::potential::{AtomSolver, AtomSolverConfig};
 use std::f64::consts::PI;
 
 /// Create a simple hydrogen-like potential for testing

@@ -18,7 +18,7 @@ use feff_rs::atoms::structure::AtomicStructure;
 use feff_rs::atoms::vector::Vector3D;
 use feff_rs::path::{
     create_path_summary_table, export_paths, format_path_description, generate_path_json,
-    generate_path_xyz, Path, PathFinder, PathFinderConfig, PathLeg, PathType,
+    generate_path_xyz, Path, PathLeg,
 };
 
 /// Creates a test structure for path visualization tests

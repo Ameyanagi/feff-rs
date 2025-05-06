@@ -407,13 +407,20 @@ impl FittingModel {
 
         // Create EXAFS parameters
         let params = ExafsParameters {
-            s02,
-            r_max: 8.0, // Sufficiently large to include all paths
-            min_importance: 0.001,
-            max_legs: 4,
-            use_debye_waller: true,
-            temperature: 300.0,
+            edge: crate::xas::Edge::K,
             energy_range: energy_grid,
+            k_range: (k_min, k_max),
+            r_range: (0.0, 6.0, 0.02),
+            fermi_energy: 0.0,
+            max_path_length: 8.0,
+            max_legs: 4,
+            max_paths: 100,
+            min_importance: 0.001,
+            debye_waller_factors: vec![0.003],
+            s02,
+            energy_shift: 0.0,
+            thermal_parameters: Some(crate::xas::thermal::ThermalParameters::default()),
+            r_max: 8.0,
         };
 
         // Find paths
@@ -522,13 +529,16 @@ impl FittingModel {
             let r_max = self.r_range.unwrap_or((0.0, 8.0)).1;
             let dr = 0.02; // Default r-space step
 
+            // Use the proper fourier_transform signature
             exafs_data = fourier_transform(
                 exafs_data,
-                self.window_function,
-                self.k_weight,
+                k_min,
+                k_max,
+                self.k_weight as u8,
                 r_min,
                 r_max,
                 dr,
+                self.window_function,
             );
         }
 

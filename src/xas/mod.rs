@@ -17,6 +17,7 @@ All rights reserved.
 mod core_hole;
 mod exafs;
 mod fitting;
+pub mod thermal;
 mod xanes;
 
 use crate::atoms::Result as AtomResult;
@@ -89,6 +90,7 @@ pub fn calculate_xas_spectrum(
             max_l: scattering.max_l as usize,
             core_hole_method: CoreHoleMethod::FinalState,
             core_hole_screening: 0.0,
+            thermal_parameters: None,
         };
 
         // Calculate XANES for this single energy point
