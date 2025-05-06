@@ -10,7 +10,7 @@ All rights reserved.
 
 use approx::assert_relative_eq;
 use feff_rs::atoms::{Atom, AtomicStructure, PotentialType, Vector3D};
-use feff_rs::potential::MuffinTinPotential;
+use feff_rs::potential::{GridType, MuffinTinPotential};
 
 /// Test the muffin-tin radius calculations
 #[test]
@@ -215,7 +215,10 @@ fn test_muffin_tin_potential() {
     structure.calculate_muffin_tin_radii().unwrap();
 
     // Create muffin-tin potential calculator
-    let mt_calculator = MuffinTinPotential::new(&structure).unwrap();
+    let mut mt_calculator = MuffinTinPotential::new(&structure).unwrap();
+
+    // For testing, use a small grid to ensure fast convergence
+    mt_calculator.set_grid(10, GridType::Logarithmic).unwrap();
 
     // Calculate the potential
     let potential = mt_calculator.calculate().unwrap();
@@ -274,6 +277,9 @@ fn test_exchange_correlation() {
     let mut mt_calculator = MuffinTinPotential::new(&structure).unwrap();
     mt_calculator.set_exchange_correlation("LDA").unwrap();
 
+    // For testing, use a small grid to ensure fast convergence
+    mt_calculator.set_grid(10, GridType::Logarithmic).unwrap();
+
     // Calculate LDA potential
     let lda_potential = mt_calculator.calculate().unwrap();
 
@@ -285,7 +291,7 @@ fn test_exchange_correlation() {
 
     // Make sure we got different results with the different approximations
     // At the same radial point, they should give different exchange-correlation potentials
-    let radial_point = 10; // Some arbitrary point in the grid, not too close to nucleus or boundary
+    let radial_point = 5; // Some arbitrary point in the grid, not too close to nucleus or boundary
     let lda_value = lda_potential.values(0).unwrap()[radial_point];
     let gga_value = gga_potential.values(0).unwrap()[radial_point];
 

@@ -21,6 +21,10 @@ pub enum ExchangeCorrelationType {
     GGA,
     /// Hedin-Lundqvist complex potential
     HedinLundqvist,
+    /// Dirac-Hara complex potential
+    DiracHara,
+    /// von Barth-Hedin potential
+    VonBarth,
 }
 
 impl ExchangeCorrelationType {
@@ -31,6 +35,10 @@ impl ExchangeCorrelationType {
             "GGA" => Ok(ExchangeCorrelationType::GGA),
             "HL" | "HEDIN-LUNDQVIST" | "HEDINLUNDQVIST" => {
                 Ok(ExchangeCorrelationType::HedinLundqvist)
+            }
+            "DH" | "DIRAC-HARA" | "DIRACHARA" => Ok(ExchangeCorrelationType::DiracHara),
+            "VBH" | "VON-BARTH" | "VONBARTH" | "VON-BARTH-HEDIN" => {
+                Ok(ExchangeCorrelationType::VonBarth)
             }
             _ => Err(PotentialError::InvalidExchangeCorrelation(format!(
                 "Unknown exchange-correlation functional: {}",
@@ -45,6 +53,8 @@ impl ExchangeCorrelationType {
             ExchangeCorrelationType::LDA => "LDA",
             ExchangeCorrelationType::GGA => "GGA",
             ExchangeCorrelationType::HedinLundqvist => "Hedin-Lundqvist",
+            ExchangeCorrelationType::DiracHara => "Dirac-Hara",
+            ExchangeCorrelationType::VonBarth => "von Barth-Hedin",
         }
     }
 }
@@ -167,6 +177,71 @@ pub fn calculate_hedin_lundqvist_potential(density: f64, energy: f64) -> (f64, f
     (real_part, imag_part)
 }
 
+/// Calculate the Dirac-Hara exchange-correlation potential with complex self-energy
+///
+/// # Arguments
+/// * `density` - electron density in electrons/bohr^3
+/// * `energy` - electron energy in Hartree
+///
+/// # Returns
+/// * Complex exchange-correlation potential in Hartree (real part, imaginary part)
+pub fn calculate_dirac_hara_potential(density: f64, energy: f64) -> (f64, f64) {
+    // Prevent division by zero or negative density
+    if density <= 1e-12 {
+        return (0.0, 0.0);
+    }
+
+    // Calculate exchange part only (Dirac exchange)
+    // Vx = -3/2 * (3ρ/π)^(1/3)
+    let exchange = -1.5 * (3.0 * density / std::f64::consts::PI).powf(1.0 / 3.0);
+
+    // Dirac-Hara adds a small imaginary part similar to Hedin-Lundqvist
+    // but with a different pre-factor
+    let plasma_freq = (4.0 * std::f64::consts::PI * density).sqrt();
+
+    // Imaginary part - weaker than HL
+    let imag_part = if energy > 0.0 {
+        -plasma_freq.powi(2) / (8.0 * energy.powi(2))
+    } else {
+        0.0
+    };
+
+    (exchange, imag_part)
+}
+
+/// Calculate the von Barth-Hedin exchange-correlation potential
+///
+/// # Arguments
+/// * `density` - electron density in electrons/bohr^3
+///
+/// # Returns
+/// * Exchange-correlation potential in Hartree
+pub fn calculate_von_barth_potential(density: f64) -> f64 {
+    // Prevent division by zero or negative density
+    if density <= 1e-12 {
+        return 0.0;
+    }
+
+    // Wigner-Seitz radius (r_s = (3/4π*ρ)^(1/3))
+    let rs = (3.0 / (4.0 * std::f64::consts::PI * density)).powf(1.0 / 3.0);
+
+    // Exchange part (Dirac exchange)
+    let exchange = -0.458 / rs;
+
+    // von Barth-Hedin correlation parameters
+    let rp = 21.0;
+    let cp = 0.045;
+    let q = 0.0333 * rp / rs;
+    let tan_q = q.atan();
+    let x = q.powi(2) + q.powi(4) + q.powi(6) / 3.0;
+
+    // Correlation potential
+    let correlation =
+        cp * ((x - tan_q) / (q.powi(6) / 3.0 - tan_q + (1.0 / 3.0) * std::f64::consts::PI));
+
+    exchange + correlation
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,6 +262,14 @@ mod tests {
             ExchangeCorrelationType::from_string("Hedin-Lundqvist").unwrap(),
             ExchangeCorrelationType::HedinLundqvist
         );
+        assert_eq!(
+            ExchangeCorrelationType::from_string("Dirac-Hara").unwrap(),
+            ExchangeCorrelationType::DiracHara
+        );
+        assert_eq!(
+            ExchangeCorrelationType::from_string("von-barth").unwrap(),
+            ExchangeCorrelationType::VonBarth
+        );
 
         // Test invalid string
         assert!(ExchangeCorrelationType::from_string("invalid").is_err());
@@ -197,6 +280,11 @@ mod tests {
         assert_eq!(
             ExchangeCorrelationType::HedinLundqvist.as_str(),
             "Hedin-Lundqvist"
+        );
+        assert_eq!(ExchangeCorrelationType::DiracHara.as_str(), "Dirac-Hara");
+        assert_eq!(
+            ExchangeCorrelationType::VonBarth.as_str(),
+            "von Barth-Hedin"
         );
     }
 
@@ -267,5 +355,60 @@ mod tests {
         assert_relative_eq!(re_above, calculate_lda_potential(density), epsilon = 1e-10);
         // Imaginary part should be negative above Fermi
         assert!(im_above < 0.0);
+    }
+
+    #[test]
+    fn test_dirac_hara_potential() {
+        // Test zero density
+        let (re, im) = calculate_dirac_hara_potential(0.0, 1.0);
+        assert_eq!(re, 0.0);
+        assert_eq!(im, 0.0);
+
+        // Test with density but energy below Fermi level
+        let density = 0.01;
+        let energy_below_fermi = -0.1;
+        let (re_below, im_below) = calculate_dirac_hara_potential(density, energy_below_fermi);
+
+        // Real part should be non-zero
+        assert!(re_below != 0.0);
+        // Imaginary part should be zero below Fermi
+        assert_eq!(im_below, 0.0);
+
+        // Test with energy above Fermi level
+        let energy_above_fermi = 0.1;
+        let (re_above, im_above) = calculate_dirac_hara_potential(density, energy_above_fermi);
+
+        // Real part should be negative (exchange only)
+        assert!(re_above < 0.0);
+        // Imaginary part should be negative above Fermi
+        assert!(im_above < 0.0);
+
+        // Dirac-Hara has weaker imaginary part than Hedin-Lundqvist
+        let (_, im_hl) = calculate_hedin_lundqvist_potential(density, energy_above_fermi);
+        assert!(im_above > im_hl); // Less negative means weaker absorption
+    }
+
+    #[test]
+    fn test_von_barth_potential() {
+        // Test zero density
+        let v_xc_zero = calculate_von_barth_potential(0.0);
+        assert_eq!(v_xc_zero, 0.0);
+
+        // Test metallic density (rs=2)
+        let density_rs2 = 3.0 / (4.0 * std::f64::consts::PI * 2.0f64.powi(3));
+        let v_xc_rs2 = calculate_von_barth_potential(density_rs2);
+
+        // Expected value: should be negative
+        assert!(v_xc_rs2 < 0.0);
+
+        // Test high density (rs=0.5)
+        let density_rs05 = 3.0 / (4.0 * std::f64::consts::PI * 0.5f64.powi(3));
+        let v_xc_rs05 = calculate_von_barth_potential(density_rs05);
+
+        // Higher density should give more negative potential
+        assert!(v_xc_rs05 < v_xc_rs2);
+
+        // von Barth should have different values from LDA
+        assert!(v_xc_rs2 != calculate_lda_potential(density_rs2));
     }
 }

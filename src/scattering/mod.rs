@@ -16,6 +16,7 @@ All rights reserved.
 
 mod phase_shift_calculator;
 mod phase_shifts;
+mod phase_shifts_from_wavefunctions;
 mod potential_phase_shifts;
 mod scattering_matrices;
 
@@ -26,6 +27,7 @@ use ndarray::Array2;
 use num_complex::Complex64;
 
 pub use phase_shifts::calculate_phase_shifts;
+pub use phase_shifts_from_wavefunctions::calculate_all_phase_shifts as calculate_phase_shifts_from_wavefunctions;
 pub use potential_phase_shifts::calculate_phase_shifts_from_potential;
 pub use scattering_matrices::{
     calculate_scattering_matrices,
@@ -64,9 +66,28 @@ pub fn calculate_phase_shifts_with_method(
             calculate_phase_shifts_from_potential(structure, energy, max_l)
         }
         PhaseShiftMethod::WavefunctionBased => {
-            // Also use the same function, but it will attempt to use wavefunction-based method first
-            // and fall back to simpler methods if needed
-            calculate_phase_shifts_from_potential(structure, energy, max_l)
+            // Use the enhanced physics-based wavefunction implementation
+            // This uses relativistic effects and better exchange-correlation potentials
+            let relativistic = true; // Use relativistic calculations by default
+            let phase_shifts =
+                calculate_phase_shifts_from_wavefunctions(structure, energy, max_l, relativistic)?;
+
+            // Calculate T-matrices
+            let mut t_matrices = Vec::with_capacity(phase_shifts.len());
+            for shifts in &phase_shifts {
+                let t_matrix =
+                    crate::utils::matrix::compute_t_matrix(shifts, max_l).map_err(|e| {
+                        AtomError::CalculationError(format!("Failed to compute T-matrix: {}", e))
+                    })?;
+                t_matrices.push(t_matrix);
+            }
+
+            Ok(ScatteringResults {
+                energy,
+                max_l,
+                phase_shifts,
+                t_matrices,
+            })
         }
     }
 }

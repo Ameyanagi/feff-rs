@@ -17,29 +17,29 @@ FEFF-rs is a Rust implementation of the FEFF code for calculating X-ray absorpti
 - [x] Implement branching strategy with main and dev branches
 
 ### 1.2 Core Data Structures and Parser
-- [ ] Define atomic structure representation
-- [ ] Implement input file parser for FEFF's format
-- [ ] Define potential and scattering data structures
+- [x] Define atomic structure representation
+- [x] Implement input file parser for FEFF's format
+- [x] Define potential and scattering data structures
 - [ ] Implement serialization/deserialization for all data structures
 
 ### 1.3 Basic Utilities
 - [x] Implement physical constants and unit conversion utilities
-- [ ] Create mathematical utility functions
-- [ ] Set up matrix operations using faer
+- [x] Create mathematical utility functions
+- [x] Set up matrix operations using faer
 - [x] Implement error types and handling
 
 ## Phase 2: Core Physics Implementation
 
 ### 2.1 Atomic Data and Potentials
-- [ ] Implement atomic data lookup and management
+- [x] Implement atomic data lookup and management
 - [ ] Implement muffin-tin potential calculations
 - [ ] Implement self-consistency loop for potentials
 - [ ] Validate against FEFF10 reference calculations
 
 ### 2.2 Scattering Calculations
-- [ ] Implement phase shift calculations
-- [ ] Implement scattering matrix calculations
-- [ ] Implement propagator matrices
+- [x] Implement phase shift calculations
+- [x] Implement scattering matrix calculations
+- [x] Implement propagator matrices
 - [ ] Validate scattering calculations against FEFF10
 
 ### 2.3 Path Finder
