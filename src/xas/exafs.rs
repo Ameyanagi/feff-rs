@@ -735,7 +735,9 @@ fn calculate_path_contribution(
     let mut total_phase_shift = 0.0;
 
     // If phase shifts are available for this potential, use them
-    if scatterer_pot_index < phase_shifts.phase_shifts.len() && !phase_shifts.phase_shifts[scatterer_pot_index].is_empty() {
+    if scatterer_pot_index < phase_shifts.phase_shifts.len()
+        && !phase_shifts.phase_shifts[scatterer_pot_index].is_empty()
+    {
         // Use l=0 (s-wave) phase shift for simple approximation
         let phase = phase_shifts.phase_shifts[scatterer_pot_index][0];
 
