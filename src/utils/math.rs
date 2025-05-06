@@ -1453,6 +1453,23 @@ pub fn generate_cubic_spline(
     Ok(result)
 }
 
+/// Calculate Lorentzian function for broadening spectral features
+///
+/// # Arguments
+///
+/// * `x` - The x-coordinate at which to evaluate the Lorentzian
+/// * `x0` - The center of the Lorentzian peak
+/// * `gamma` - The half-width at half-maximum (HWHM) of the peak
+///
+/// # Returns
+///
+/// The value of the Lorentzian function at x
+pub fn lorentzian(x: f64, x0: f64, gamma: f64) -> f64 {
+    let numerator = gamma;
+    let denominator = PI * (gamma * gamma + (x - x0) * (x - x0));
+    numerator / denominator
+}
+
 /// Radial basis function (RBF) interpolation for scattered data
 ///
 /// # Arguments

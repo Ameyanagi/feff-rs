@@ -11,6 +11,7 @@ All rights reserved.
 //! Vector3D type for representing 3D positions and directions
 
 use std::fmt;
+use std::ops::{Add, Sub};
 
 /// Represents a 3D vector for positions and other spatial quantities
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -79,6 +80,30 @@ impl Vector3D {
 impl fmt::Display for Vector3D {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({:.6}, {:.6}, {:.6})", self.x, self.y, self.z)
+    }
+}
+
+impl Add for Vector3D {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        }
+    }
+}
+
+impl Sub for Vector3D {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+        }
     }
 }
 

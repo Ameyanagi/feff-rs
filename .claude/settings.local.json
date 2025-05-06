@@ -25,7 +25,9 @@
       "WebFetch(domain:docs.rs)",
       "Bash(RUSTFLAGS=\"-C target-cpu=native\" cargo bench simd_matrix_benchmark -- --measurement-time 10)",
       "Bash(RUSTFLAGS=\"-C target-cpu=native\" cargo bench \"simd_matrix_benchmark\")",
-      "Bash(time cargo run --release -- --help)"
+      "Bash(time cargo run --release -- --help)",
+      "Bash(unzip:*)",
+      "Bash(RUST_BACKTRACE=1 cargo test -p feff-rs --test xanes_tests test_xanes_spectrum_from_path_operator -- --nocapture)"
     ],
     "deny": []
   }

@@ -106,15 +106,23 @@ pub fn calculate_scattering_matrices(
     let green_matrix = results.0?;
     let global_t_matrix = results.1?;
 
-    // Return the results
-    Ok(ScatteringMatrixResults {
+    // Create the results structure
+    let mut results = ScatteringMatrixResults {
         energy,
         max_l,
         phase_shifts: phase_shifts.phase_shifts.clone(),
         t_matrices: phase_shifts.t_matrices.clone(),
         green_matrix,
         global_t_matrix,
-    })
+        structure: Some(std::sync::Arc::new(structure.clone())),
+        path_operator: None,
+    };
+
+    // Calculate and add the path operator
+    let path_operator = results.calculate_path_operator()?;
+    results.path_operator = Some(path_operator);
+
+    Ok(results)
 }
 
 /// Extract positions of all atoms in the structure as a vector of (x, y, z) tuples

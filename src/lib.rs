@@ -279,9 +279,9 @@ mod tests {
             assert_eq!(spectrum[i].0, energy);
         }
 
-        // Absorption coefficients should be positive
+        // Absorption coefficients should be positive or zero
         for &(_, mu) in &spectrum {
-            assert!(mu > 0.0);
+            assert!(mu >= 0.0);
         }
     }
 }

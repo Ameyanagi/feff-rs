@@ -147,6 +147,12 @@ pub struct ScatteringMatrixResults {
 
     /// Global T-matrix for the entire structure
     pub global_t_matrix: Array2<Complex64>,
+
+    /// Optional atomic structure to enable additional calculations
+    pub structure: Option<std::sync::Arc<AtomicStructure>>,
+
+    /// Optional path operator for multiple scattering calculations
+    pub path_operator: Option<Array2<Complex64>>,
 }
 
 impl ScatteringMatrixResults {
@@ -160,6 +166,45 @@ impl ScatteringMatrixResults {
         matrix::compute_path_operator(&self.green_matrix, &self.global_t_matrix).map_err(|e| {
             AtomError::CalculationError(format!("Failed to compute path operator: {}", e))
         })
+    }
+
+    /// Calculate and store the path operator in this result
+    ///
+    /// # Returns
+    ///
+    /// Reference to self for method chaining
+    pub fn with_path_operator(&mut self) -> AtomResult<&mut Self> {
+        let path_op = self.calculate_path_operator()?;
+        self.path_operator = Some(path_op);
+        Ok(self)
+    }
+
+    /// Attach the atomic structure to this result
+    ///
+    /// # Arguments
+    ///
+    /// * `structure` - The atomic structure to attach
+    ///
+    /// # Returns
+    ///
+    /// Reference to self for method chaining
+    pub fn with_structure(&mut self, structure: AtomicStructure) -> &mut Self {
+        self.structure = Some(std::sync::Arc::new(structure));
+        self
+    }
+
+    /// Get the path operator, calculating it if necessary
+    ///
+    /// # Returns
+    ///
+    /// The path operator matrix
+    pub fn get_path_operator(&mut self) -> AtomResult<&Array2<Complex64>> {
+        if self.path_operator.is_none() {
+            let path_op = self.calculate_path_operator()?;
+            self.path_operator = Some(path_op);
+        }
+
+        Ok(self.path_operator.as_ref().unwrap())
     }
 }
 

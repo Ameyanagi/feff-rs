@@ -18,7 +18,14 @@ pub enum UtilsError {
     /// Generic error with a message
     #[error("Utility error: {0}")]
     Generic(String),
+    
+    /// Math-related errors
+    #[error("Math error: {0}")]
+    Math(String),
 }
+
+/// Alias for Math-related errors
+pub type MathError = UtilsError;
 
 /// A specialized Result type for utils operations
 pub type Result<T> = std::result::Result<T, UtilsError>;
