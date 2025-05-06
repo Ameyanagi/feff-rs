@@ -14,14 +14,23 @@ All rights reserved.
 //! The implementation follows the muffin-tin potential approach used in FEFF10,
 //! where the space is divided into non-overlapping spherical regions centered on atoms.
 
+mod atom_solver;
 pub mod electron_config;
 mod errors;
 mod exchange_correlation;
 mod muffin_tin;
+mod muffin_tin_wavefunction;
+mod numerov;
+mod radial_wavefunction;
+mod scf;
 
+pub use atom_solver::{AtomSolver, AtomSolverConfig};
 pub use errors::{PotentialError, Result};
 pub use exchange_correlation::ExchangeCorrelationType;
 pub use muffin_tin::{GridType, MuffinTinPotential, MuffinTinPotentialResult};
+pub use muffin_tin_wavefunction::{AtomicWavefunctions, MuffinTinWavefunction};
+pub use radial_wavefunction::RadialWavefunction;
+pub use scf::{MixingMethod, SelfConsistencyResult};
 
 #[cfg(test)]
 mod tests {
