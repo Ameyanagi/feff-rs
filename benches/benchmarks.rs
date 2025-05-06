@@ -10,9 +10,11 @@ All rights reserved.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use feff_rs::atoms::{Atom, AtomicStructure, PotentialType, Vector3D};
-use feff_rs::fms::{FmsMatrix, FmsSolver, SolverMethod, XanesCalculator, FmsParameters};
+use feff_rs::fms::{FmsMatrix, FmsParameters, FmsSolver, SolverMethod, XanesCalculator};
 use feff_rs::potential::MuffinTinPotential;
-use feff_rs::scattering::{calculate_phase_shifts, calculate_scattering_matrices_old, ScatteringMatrixResults};
+use feff_rs::scattering::{
+    calculate_phase_shifts, calculate_scattering_matrices_old, ScatteringMatrixResults,
+};
 use feff_rs::utils::matrix::{
     compute_free_greens_matrix, compute_path_operator, compute_structure_factor, compute_t_matrix,
 };
@@ -359,11 +361,11 @@ fn fms_matrix_benchmark(c: &mut Criterion) {
 
 fn fms_solver_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("FMS Solver Methods");
-    
+
     // Create test matrix and parameters
     let n = 100; // Matrix size
     let mut test_matrix = Array2::<Complex64>::zeros((n, n));
-    
+
     // Fill matrix with realistic data to simulate FMS matrix
     for i in 0..n {
         for j in 0..n {
@@ -375,7 +377,7 @@ fn fms_solver_benchmark(c: &mut Criterion) {
             }
         }
     }
-    
+
     // Benchmark each solver method
     for &method in &[
         SolverMethod::LuDecomposition,
@@ -393,20 +395,20 @@ fn fms_solver_benchmark(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
 fn xanes_calculator_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("XANES Calculator");
-    
+
     // Create test structure and path operator for XANES calculation
     let structure = create_benchmark_structure(50);
     let n = 16 * structure.atom_count(); // Size based on l_max=3 and atom count
-    
+
     // Create a sample path operator matrix
     let mut path_operator = Array2::<Complex64>::zeros((n, n));
-    
+
     // Fill with realistic data
     for i in 0..n {
         for j in 0..n {
@@ -418,7 +420,7 @@ fn xanes_calculator_benchmark(c: &mut Criterion) {
             }
         }
     }
-    
+
     // Create energy grid for spectrum calculation
     let energy_min = 0.0;
     let energy_max = 100.0;
@@ -429,7 +431,7 @@ fn xanes_calculator_benchmark(c: &mut Criterion) {
         energies.push(e);
         e += energy_step;
     }
-    
+
     // Benchmark single-point XANES calculation
     group.bench_with_input(
         BenchmarkId::new("xanes_single_point", structure.atom_count()),
@@ -437,11 +439,15 @@ fn xanes_calculator_benchmark(c: &mut Criterion) {
         |b, (structure, path_operator, energy)| {
             b.iter(|| {
                 let calculator = XanesCalculator::new(black_box(*structure), 1.0);
-                black_box(calculator.calculate_xanes(black_box(*energy), black_box(path_operator)).unwrap());
+                black_box(
+                    calculator
+                        .calculate_xanes(black_box(*energy), black_box(path_operator))
+                        .unwrap(),
+                );
             })
         },
     );
-    
+
     // Benchmark batch XANES calculation using sequential processing
     group.bench_with_input(
         BenchmarkId::new("xanes_spectrum_sequential", energies.len()),
@@ -449,19 +455,21 @@ fn xanes_calculator_benchmark(c: &mut Criterion) {
         |b, (structure, path_operator, energies)| {
             b.iter(|| {
                 let calculator = XanesCalculator::new(black_box(*structure), 1.0);
-                
+
                 // Calculate each point sequentially
                 let mut results = Vec::with_capacity(energies.len());
                 for &energy in *energies {
-                    let value = calculator.calculate_xanes(black_box(energy), black_box(path_operator)).unwrap();
+                    let value = calculator
+                        .calculate_xanes(black_box(energy), black_box(path_operator))
+                        .unwrap();
                     results.push(value);
                 }
-                
+
                 black_box(results)
             })
         },
     );
-    
+
     // Benchmark batch XANES calculation using parallel processing
     group.bench_with_input(
         BenchmarkId::new("xanes_spectrum_parallel", energies.len()),
@@ -469,19 +477,23 @@ fn xanes_calculator_benchmark(c: &mut Criterion) {
         |b, (structure, path_operator, energies)| {
             b.iter(|| {
                 let calculator = XanesCalculator::new(black_box(*structure), 1.0);
-                
+
                 // Use the batch calculation method
-                black_box(calculator.calculate_xanes_spectrum(black_box(energies), black_box(path_operator)).unwrap())
+                black_box(
+                    calculator
+                        .calculate_xanes_spectrum(black_box(energies), black_box(path_operator))
+                        .unwrap(),
+                )
             })
         },
     );
-    
+
     group.finish();
 }
 
 fn fms_end_to_end_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("FMS End-to-End");
-    
+
     // Simplified version of scattering matrix results
     struct MockScatteringResults {
         pub green_matrix: Array2<Complex64>,
@@ -489,7 +501,7 @@ fn fms_end_to_end_benchmark(c: &mut Criterion) {
         pub max_l: usize,
         pub energy: f64,
     }
-    
+
     // Test with different structure sizes
     for size in [10, 20] {
         let structure = create_benchmark_structure(size);
@@ -497,11 +509,11 @@ fn fms_end_to_end_benchmark(c: &mut Criterion) {
         let max_l = 3;
         let l_size = (max_l + 1) * (max_l + 1);
         let n = atom_count * l_size;
-        
+
         // Create mock scattering matrix results
         let green_matrix = Array2::<Complex64>::zeros((n, n));
         let global_t_matrix = Array2::<Complex64>::zeros((n, n));
-        
+
         // Fill with realistic data
         for i in 0..n {
             for j in 0..n {
@@ -522,7 +534,7 @@ fn fms_end_to_end_benchmark(c: &mut Criterion) {
                 }
             }
         }
-        
+
         let mock_results = ScatteringMatrixResults {
             phase_shifts: Vec::new(), // Not used in the benchmark
             green_matrix,
@@ -530,12 +542,12 @@ fn fms_end_to_end_benchmark(c: &mut Criterion) {
             max_l,
             energy: 100.0,
         };
-        
+
         // Create FMS parameters for benchmark
         let mut parameters = FmsParameters::default();
         parameters.radius = 6.0;
         parameters.solver_method = SolverMethod::LuDecomposition;
-        
+
         // Add energy grid
         let energy_min = 95.0;
         let energy_max = 105.0;
@@ -547,45 +559,55 @@ fn fms_end_to_end_benchmark(c: &mut Criterion) {
             e += energy_step;
         }
         parameters.energies = energies;
-        
+
         // Benchmark FMS calculation
         group.bench_with_input(
             BenchmarkId::new("fms_calculation", atom_count),
             &(&structure, &mock_results, parameters.clone()),
             |b, (structure, mock_results, params)| {
                 b.iter(|| {
-                    black_box(feff_rs::fms::calculate_fms(
-                        black_box(*structure),
-                        black_box(mock_results),
-                        black_box(params.clone()),
-                    ).unwrap())
+                    black_box(
+                        feff_rs::fms::calculate_fms(
+                            black_box(*structure),
+                            black_box(mock_results),
+                            black_box(params.clone()),
+                        )
+                        .unwrap(),
+                    )
                 })
             },
         );
-        
+
         // Set different solver methods for comparison
-        let solver_methods = [SolverMethod::LuDecomposition, SolverMethod::IterativeCGS, SolverMethod::BlockDiagonal];
-        
+        let solver_methods = [
+            SolverMethod::LuDecomposition,
+            SolverMethod::IterativeCGS,
+            SolverMethod::BlockDiagonal,
+        ];
+
         for &method in &solver_methods {
             let mut params = parameters.clone();
             params.solver_method = method;
-            
+
             group.bench_with_input(
                 BenchmarkId::new(format!("fms_method_{:?}", method), atom_count),
                 &(&structure, &mock_results, params.clone()),
                 |b, (structure, mock_results, params)| {
                     b.iter(|| {
-                        black_box(feff_rs::fms::calculate_fms(
-                            black_box(*structure),
-                            black_box(mock_results),
-                            black_box(params.clone()),
-                        ).unwrap())
+                        black_box(
+                            feff_rs::fms::calculate_fms(
+                                black_box(*structure),
+                                black_box(mock_results),
+                                black_box(params.clone()),
+                            )
+                            .unwrap(),
+                        )
                     })
                 },
             );
         }
     }
-    
+
     group.finish();
 }
 

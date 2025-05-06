@@ -105,7 +105,7 @@ pub fn calculate_fms(
 ) -> Result<FmsResults> {
     // Create FMS matrix builder
     let fms_matrix = FmsMatrix::new(structure, parameters.radius)?;
-    
+
     // Get or generate energy grid
     let energies = if !parameters.energies.is_empty() {
         parameters.energies.clone()
@@ -115,23 +115,26 @@ pub fn calculate_fms(
         let emin = e0 - 10.0;
         let emax = e0 + 40.0;
         let estep = 0.5;
-        
+
         // Generate energy grid directly
         let num_points = ((emax - emin) / estep).ceil() as usize + 1;
         (0..num_points).map(|i| emin + i as f64 * estep).collect()
     };
-    
+
     // Create FMS solver with appropriate method
     let solver = FmsSolver::new(parameters.solver_method);
-    
-    // Create XANES calculator if needed 
+
+    // Create XANES calculator if needed
     let calculate_xanes = parameters.calculate_xanes;
     let xanes_calculator = if calculate_xanes {
-        Some(XanesCalculator::new(structure, parameters.core_hole_lifetime))
+        Some(XanesCalculator::new(
+            structure,
+            parameters.core_hole_lifetime,
+        ))
     } else {
         None
     };
-    
+
     // For parallel calculation, we need thread-safe data structures
     // Create a structure to hold results for each energy point
     #[derive(Debug)]
@@ -140,7 +143,7 @@ pub fn calculate_fms(
         xanes_value: Option<f64>,
         amplitude: Complex64,
     }
-    
+
     // Determine if we should use parallel processing
     // Only parallelize if we have a significant number of energy points
     let results = if energies.len() > 8 {
@@ -148,24 +151,27 @@ pub fn calculate_fms(
         // If we do, we can optimize by doing the XANES calculation for all energies at once
         if calculate_xanes && xanes_calculator.is_some() {
             // First, calculate all the path operators for each energy in parallel
-            let path_operators: Vec<Result<(f64, Array2<Complex64>, Complex64)>> = energies.par_iter().map(|&energy| -> Result<(f64, Array2<Complex64>, Complex64)> {
-                // Build FMS matrix for this energy
-                let fms_mat = fms_matrix.build_fms_matrix(scattering_matrices)?;
-                
-                // Solve FMS equations
-                let path_operator = solver.solve(&fms_mat)?;
-                
-                // Calculate scattering amplitude
-                let amplitude = calculate_scattering_amplitude(structure, &path_operator)?;
-                
-                // Return the energy, path operator, and amplitude
-                Ok((energy, path_operator, amplitude))
-            }).collect();
-            
+            let path_operators: Vec<Result<(f64, Array2<Complex64>, Complex64)>> = energies
+                .par_iter()
+                .map(|&energy| -> Result<(f64, Array2<Complex64>, Complex64)> {
+                    // Build FMS matrix for this energy
+                    let fms_mat = fms_matrix.build_fms_matrix(scattering_matrices)?;
+
+                    // Solve FMS equations
+                    let path_operator = solver.solve(&fms_mat)?;
+
+                    // Calculate scattering amplitude
+                    let amplitude = calculate_scattering_amplitude(structure, &path_operator)?;
+
+                    // Return the energy, path operator, and amplitude
+                    Ok((energy, path_operator, amplitude))
+                })
+                .collect();
+
             // Check if any calculation failed
             let mut processed_results = Vec::with_capacity(energies.len());
             let mut operators_by_energy = Vec::with_capacity(energies.len());
-            
+
             for result in path_operators {
                 match result {
                     Ok((energy, path_operator, amplitude)) => {
@@ -175,11 +181,11 @@ pub fn calculate_fms(
                             amplitude,
                         });
                         operators_by_energy.push((energy, path_operator));
-                    },
+                    }
                     Err(err) => return Err(err),
                 }
             }
-            
+
             // Now calculate all XANES values at once using the batch method
             // Extract all path operators and calculate XANES for all energies in one go
             if let Some(ref xanes_calc) = xanes_calculator {
@@ -189,39 +195,42 @@ pub fn calculate_fms(
                     processed_results[index].xanes_value = Some(xanes_value);
                 }
             }
-            
+
             processed_results
         } else {
             // No XANES calculation needed, use the regular parallel approach
             // Process energy points in parallel using Rayon
-            energies.par_iter().map(|&energy| -> Result<EnergyResult> {
-                // Build FMS matrix for this energy
-                let fms_mat = fms_matrix.build_fms_matrix(scattering_matrices)?;
-                
-                // Solve FMS equations
-                let path_operator = solver.solve(&fms_mat)?;
-                
-                // Calculate scattering amplitude
-                let amplitude = calculate_scattering_amplitude(structure, &path_operator)?;
-                
-                // Calculate XANES if requested
-                let xanes_value = if let Some(ref xanes_calc) = xanes_calculator {
-                    if calculate_xanes {
-                        Some(xanes_calc.calculate_xanes(energy, &path_operator)?)
+            energies
+                .par_iter()
+                .map(|&energy| -> Result<EnergyResult> {
+                    // Build FMS matrix for this energy
+                    let fms_mat = fms_matrix.build_fms_matrix(scattering_matrices)?;
+
+                    // Solve FMS equations
+                    let path_operator = solver.solve(&fms_mat)?;
+
+                    // Calculate scattering amplitude
+                    let amplitude = calculate_scattering_amplitude(structure, &path_operator)?;
+
+                    // Calculate XANES if requested
+                    let xanes_value = if let Some(ref xanes_calc) = xanes_calculator {
+                        if calculate_xanes {
+                            Some(xanes_calc.calculate_xanes(energy, &path_operator)?)
+                        } else {
+                            None
+                        }
                     } else {
                         None
-                    }
-                } else {
-                    None
-                };
-                
-                // Return results for this energy point
-                Ok(EnergyResult {
-                    energy,
-                    xanes_value,
-                    amplitude,
+                    };
+
+                    // Return results for this energy point
+                    Ok(EnergyResult {
+                        energy,
+                        xanes_value,
+                        amplitude,
+                    })
                 })
-            }).collect::<Result<Vec<_>>>()?
+                .collect::<Result<Vec<_>>>()?
         }
     } else {
         // For small number of energy points, use sequential processing to avoid overhead
@@ -229,29 +238,29 @@ pub fn calculate_fms(
             // Even for small number of points, we can still benefit from optimizing the XANES calculation
             let mut operators_by_energy = Vec::with_capacity(energies.len());
             let mut processed_results = Vec::with_capacity(energies.len());
-            
+
             // First collect all path operators
             for &energy in energies.iter() {
                 // Build FMS matrix for this energy
                 let fms_mat = fms_matrix.build_fms_matrix(scattering_matrices)?;
-                
+
                 // Solve FMS equations
                 let path_operator = solver.solve(&fms_mat)?;
-                
+
                 // Calculate scattering amplitude
                 let amplitude = calculate_scattering_amplitude(structure, &path_operator)?;
-                
+
                 // Add to results
                 processed_results.push(EnergyResult {
                     energy,
                     xanes_value: None, // We'll fill this in later
                     amplitude,
                 });
-                
+
                 // Save the path operator for XANES calculation
                 operators_by_energy.push((energy, path_operator));
             }
-            
+
             // Now calculate XANES for all energies
             if let Some(ref xanes_calc) = xanes_calculator {
                 // For each (energy, path_operator) pair, calculate the XANES value
@@ -260,56 +269,63 @@ pub fn calculate_fms(
                     processed_results[index].xanes_value = Some(xanes_value);
                 }
             }
-            
+
             processed_results
         } else {
             // Standard sequential processing
-            energies.iter().map(|&energy| -> Result<EnergyResult> {
-                // Build FMS matrix for this energy
-                let fms_mat = fms_matrix.build_fms_matrix(scattering_matrices)?;
-                
-                // Solve FMS equations
-                let path_operator = solver.solve(&fms_mat)?;
-                
-                // Calculate scattering amplitude
-                let amplitude = calculate_scattering_amplitude(structure, &path_operator)?;
-                
-                // Calculate XANES if requested
-                let xanes_value = if let Some(ref xanes_calc) = xanes_calculator {
-                    if calculate_xanes {
-                        Some(xanes_calc.calculate_xanes(energy, &path_operator)?)
+            energies
+                .iter()
+                .map(|&energy| -> Result<EnergyResult> {
+                    // Build FMS matrix for this energy
+                    let fms_mat = fms_matrix.build_fms_matrix(scattering_matrices)?;
+
+                    // Solve FMS equations
+                    let path_operator = solver.solve(&fms_mat)?;
+
+                    // Calculate scattering amplitude
+                    let amplitude = calculate_scattering_amplitude(structure, &path_operator)?;
+
+                    // Calculate XANES if requested
+                    let xanes_value = if let Some(ref xanes_calc) = xanes_calculator {
+                        if calculate_xanes {
+                            Some(xanes_calc.calculate_xanes(energy, &path_operator)?)
+                        } else {
+                            None
+                        }
                     } else {
                         None
-                    }
-                } else {
-                    None
-                };
-                
-                // Return results for this energy point
-                Ok(EnergyResult {
-                    energy,
-                    xanes_value,
-                    amplitude,
+                    };
+
+                    // Return results for this energy point
+                    Ok(EnergyResult {
+                        energy,
+                        xanes_value,
+                        amplitude,
+                    })
                 })
-            }).collect::<Result<Vec<_>>>()?
+                .collect::<Result<Vec<_>>>()?
         }
     };
-    
+
     // Sort results by energy (parallel processing might return results out of order)
     // We need stable sorting to preserve the original order for identical energy points
     let mut sorted_results = results;
-    sorted_results.sort_by(|a, b| a.energy.partial_cmp(&b.energy).unwrap_or(std::cmp::Ordering::Equal));
-    
+    sorted_results.sort_by(|a, b| {
+        a.energy
+            .partial_cmp(&b.energy)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
     // Combine results into the final data structures
     let mut xanes = if calculate_xanes {
         Some(Vec::with_capacity(energies.len()))
     } else {
         None
     };
-    
+
     let mut im_scattering_amplitude = Some(Vec::with_capacity(energies.len()));
     let mut re_scattering_amplitude = Some(Vec::with_capacity(energies.len()));
-    
+
     // Extract results from sorted_results
     for result in sorted_results {
         // Store scattering amplitude components
@@ -319,7 +335,7 @@ pub fn calculate_fms(
         if let Some(ref mut re_amp) = re_scattering_amplitude {
             re_amp.push(result.amplitude.re);
         }
-        
+
         // Store XANES values if calculated
         if let Some(ref mut xanes_spectrum) = xanes {
             if let Some(xanes_value) = result.xanes_value {
@@ -327,7 +343,7 @@ pub fn calculate_fms(
             }
         }
     }
-    
+
     // Return combined results
     Ok(FmsResults {
         energies,
@@ -359,17 +375,17 @@ fn calculate_scattering_amplitude(
 ) -> Result<Complex64> {
     // Get the central atom index (typically the first atom)
     let central_atom_idx = 0;
-    
+
     // Determine the angular momentum size based on the path operator matrix dimensions
     let path_op_size = path_operator.shape()[0];
     let atom_count = structure.atom_count();
-    
+
     if atom_count == 0 {
         return Err(FmsError::CalculationError(
-            "No atoms in structure".to_string()
+            "No atoms in structure".to_string(),
         ));
     }
-    
+
     // Calculate l_size (number of angular momentum components per atom)
     let l_size = path_op_size / atom_count;
     if l_size * atom_count != path_op_size {
@@ -378,19 +394,20 @@ fn calculate_scattering_amplitude(
             path_op_size, atom_count
         )));
     }
-    
+
     // Calculate max_l from l_size
     // l_size = (max_l + 1)^2, so max_l = sqrt(l_size) - 1
     let max_l = (l_size as f64).sqrt() as usize - 1;
-    
+
     // Get the starting index for the central atom in the path operator
     let start_idx = central_atom_idx * l_size;
-    
+
     // Sum over the diagonal elements of the central atom's block
     // Use Rayon for parallel sum if l_size is large enough
     let mut total_amplitude = if l_size > 32 {
         // Parallel summation for large angular momentum basis
-        (0..l_size).into_par_iter()
+        (0..l_size)
+            .into_par_iter()
             .map(|i| path_operator[(start_idx + i, start_idx + i)])
             .reduce(|| Complex64::new(0.0, 0.0), |a, b| a + b)
     } else {
@@ -399,7 +416,7 @@ fn calculate_scattering_amplitude(
             sum + path_operator[(start_idx + i, start_idx + i)]
         })
     };
-    
+
     // Normalize by the number of angular momentum states (2l+1) for each l
     // This is a physical normalization factor based on quantum mechanics
     let mut normalization_factor = 0.0;
@@ -407,11 +424,11 @@ fn calculate_scattering_amplitude(
         // Each l contributes (2l+1) states
         normalization_factor += (2 * l + 1) as f64;
     }
-    
+
     if normalization_factor > 0.0 {
         total_amplitude /= Complex64::new(normalization_factor, 0.0);
     }
-    
+
     Ok(total_amplitude)
 }
 

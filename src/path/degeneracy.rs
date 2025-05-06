@@ -16,7 +16,6 @@ All rights reserved.
 use std::collections::{HashMap, HashSet};
 
 use crate::atoms::structure::AtomicStructure;
-use crate::atoms::vector::Vector3D;
 use crate::path::path::{Path, PathType};
 
 /// Checks if two paths are geometrically equivalent
@@ -46,32 +45,32 @@ pub fn are_paths_geometrically_equivalent(
     if path1.legs.len() != path2.legs.len() {
         return false;
     }
-    
+
     // Total path lengths must be similar
     if (path1.total_length - path2.total_length).abs() > length_tolerance {
         return false;
     }
-    
+
     // Check individual leg lengths
     for (leg1, leg2) in path1.legs.iter().zip(path2.legs.iter()) {
         if (leg1.length - leg2.length).abs() > length_tolerance {
             return false;
         }
     }
-    
+
     // For paths with 3 or more legs, check scattering angles
     if path1.legs.len() >= 3 {
         // Compare scattering angles at each middle atom
         for i in 1..path1.legs.len() {
             let angle1 = calculate_scattering_angle(path1, i, structure);
             let angle2 = calculate_scattering_angle(path2, i, structure);
-            
+
             if (angle1 - angle2).abs() > angle_tolerance {
                 return false;
             }
         }
     }
-    
+
     true
 }
 
@@ -95,25 +94,25 @@ fn calculate_scattering_angle(path: &Path, position: usize, structure: &AtomicSt
     if position == 0 || position >= path.atom_sequence.len() - 1 {
         return 0.0;
     }
-    
+
     let atom_index = path.atom_sequence[position];
-    
+
     // Get the previous and next atoms in the path
     let prev_atom_index = path.atom_sequence[position - 1];
     let next_atom_index = path.atom_sequence[position + 1];
-    
+
     // Get atom positions
-    let atom_pos = structure.atom(atom_index).unwrap().position().clone();
-    let prev_atom_pos = structure.atom(prev_atom_index).unwrap().position().clone();
-    let next_atom_pos = structure.atom(next_atom_index).unwrap().position().clone();
-    
+    let atom_pos = *structure.atom(atom_index).unwrap().position();
+    let prev_atom_pos = *structure.atom(prev_atom_index).unwrap().position();
+    let next_atom_pos = *structure.atom(next_atom_index).unwrap().position();
+
     // Calculate vectors for incoming and outgoing legs
     let incoming_vec = (atom_pos - prev_atom_pos).normalize();
     let outgoing_vec = (next_atom_pos - atom_pos).normalize();
-    
+
     // Calculate the angle between the vectors
     let cos_angle = incoming_vec.dot(&outgoing_vec);
-    
+
     // Return the angle in radians, clamped to valid range
     cos_angle.clamp(-1.0, 1.0).acos()
 }
@@ -141,24 +140,24 @@ pub fn calculate_path_degeneracies(
 ) -> Vec<Path> {
     // Group paths by length for more efficient comparison
     let mut length_groups: HashMap<i64, Vec<Path>> = HashMap::new();
-    
+
     for path in paths {
         // Round the length to group similar paths
         let rounded_length = (path.total_length * 1000.0).round() as i64;
         length_groups.entry(rounded_length).or_default().push(path);
     }
-    
+
     let mut unique_paths = Vec::new();
-    
+
     // For each length group, find equivalent paths
     for paths in length_groups.values() {
         let mut path_groups: Vec<Vec<Path>> = Vec::new();
-        
+
         'outer: for path in paths {
             // Check if this path is equivalent to any existing group
             for group in &mut path_groups {
                 let representative = &group[0];
-                
+
                 if are_paths_geometrically_equivalent(
                     representative,
                     path,
@@ -171,11 +170,11 @@ pub fn calculate_path_degeneracies(
                     continue 'outer;
                 }
             }
-            
+
             // Path doesn't match any group, create a new group
             path_groups.push(vec![path.clone()]);
         }
-        
+
         // Create a representative path for each group with degeneracy set
         for group in path_groups {
             let mut representative = group[0].clone();
@@ -183,7 +182,7 @@ pub fn calculate_path_degeneracies(
             unique_paths.push(representative);
         }
     }
-    
+
     unique_paths
 }
 
@@ -208,61 +207,63 @@ pub fn calculate_single_path_degeneracy(path: &Path, structure: &AtomicStructure
             let scatterer = structure.atom(scatterer_index).unwrap();
             let absorber_index = path.atom_sequence[0];
             let absorber = structure.atom(absorber_index).unwrap();
-            
+
             let mut equivalent_count = 0;
-            
+
             // Find atoms of the same type (atomic number) at approximately the same distance
             for (index, atom) in structure.atoms().iter().enumerate() {
                 if index == absorber_index || index == scatterer_index {
                     continue;
                 }
-                
+
                 if atom.atomic_number() == scatterer.atomic_number() {
                     let distance = atom.distance_to(absorber);
-                    
+
                     // Check if this atom is at approximately the same distance
                     if (distance - path.legs[0].length).abs() < 0.01 {
                         equivalent_count += 1;
                     }
                 }
             }
-            
+
             // Add 1 for the original scatterer
             equivalent_count + 1
-        },
+        }
         PathType::DoubleScattering | PathType::Triangle => {
             // For double scattering and triangle paths, the calculation is more complex
             // This is a simplified version that considers only the atoms in the path
             let mut equivalent_count = 1;
-            
+
             // For each scatterer in the path, find equivalent atoms
-            let unique_scatterers: HashSet<usize> = path.atom_sequence
+            let unique_scatterers: HashSet<usize> = path
+                .atom_sequence
                 .iter()
                 .skip(1) // Skip absorber
                 .copied()
                 .collect();
-            
+
             for &scatterer_index in &unique_scatterers {
                 let scatterer = structure.atom(scatterer_index).unwrap();
-                
+
                 // Count atoms of the same type
-                let same_type_count = structure.atoms()
+                let same_type_count = structure
+                    .atoms()
                     .iter()
                     .filter(|atom| atom.atomic_number() == scatterer.atomic_number())
                     .count();
-                
+
                 // Adjust the degeneracy
                 equivalent_count *= same_type_count as u32;
             }
-            
+
             // This is a simplified calculation; in reality, we would need to consider
             // the exact geometric arrangement of atoms and symmetry operations
             equivalent_count
-        },
+        }
         PathType::MultipleScattering => {
             // For more complex paths, this would use the full symmetry analysis
             // For now, return 1 as a default
             1
-        },
+        }
     }
 }

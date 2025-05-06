@@ -20,7 +20,7 @@ use crate::atoms::{AtomicStructure, Result as AtomResult};
 use crate::path::{Path, PathFinder, PathFinderConfig};
 use crate::scattering::ScatteringResults;
 use crate::xas::exafs::{
-    calculate_exafs, fourier_transform, EnergyGrid, ExafsData, ExafsParameters, WindowFunction,
+    fourier_transform, EnergyGrid, ExafsData, ExafsParameters, WindowFunction,
 };
 
 /// Errors that can occur during EXAFS fitting

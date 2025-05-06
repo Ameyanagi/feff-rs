@@ -18,7 +18,7 @@ pub enum UtilsError {
     /// Generic error with a message
     #[error("Utility error: {0}")]
     Generic(String),
-    
+
     /// Math-related errors
     #[error("Math error: {0}")]
     Math(String),

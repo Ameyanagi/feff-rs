@@ -20,7 +20,6 @@ mod fitting;
 mod xanes;
 
 use crate::atoms::Result as AtomResult;
-use crate::path::Path;
 use crate::scattering::ScatteringMatrixResults;
 
 pub use core_hole::{calculate_with_core_hole, CoreHoleConfig, CoreHoleMethod};

@@ -47,22 +47,23 @@ pub enum Edge {
     M5,
 }
 
-impl Edge {
-    /// Convert edge to string representation
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for Edge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Edge::K => "K".to_string(),
-            Edge::L1 => "L1".to_string(),
-            Edge::L2 => "L2".to_string(),
-            Edge::L3 => "L3".to_string(),
-            Edge::M1 => "M1".to_string(),
-            Edge::M2 => "M2".to_string(),
-            Edge::M3 => "M3".to_string(),
-            Edge::M4 => "M4".to_string(),
-            Edge::M5 => "M5".to_string(),
+            Edge::K => write!(f, "K"),
+            Edge::L1 => write!(f, "L1"),
+            Edge::L2 => write!(f, "L2"),
+            Edge::L3 => write!(f, "L3"),
+            Edge::M1 => write!(f, "M1"),
+            Edge::M2 => write!(f, "M2"),
+            Edge::M3 => write!(f, "M3"),
+            Edge::M4 => write!(f, "M4"),
+            Edge::M5 => write!(f, "M5"),
         }
     }
+}
 
+impl Edge {
     /// Get the principal quantum number for this edge
     pub fn principal_quantum_number(&self) -> usize {
         match self {
@@ -532,12 +533,7 @@ pub fn calculate_xanes_from_path_operator(
     let edge_energy = params.edge.edge_energy(atomic_number);
 
     // Create the result structure
-    let mut spectrum = XanesSpectrum::new(
-        params.edge.clone(),
-        atomic_number,
-        edge_energy,
-        params.clone(),
-    );
+    let mut spectrum = XanesSpectrum::new(params.edge, atomic_number, edge_energy, params.clone());
 
     // Generate energy grid
     spectrum.generate_energy_grid()?;
@@ -654,12 +650,7 @@ pub fn calculate_xanes(
     let edge_energy = params.edge.edge_energy(atomic_number);
 
     // Create the result structure
-    let mut spectrum = XanesSpectrum::new(
-        params.edge.clone(),
-        atomic_number,
-        edge_energy,
-        params.clone(),
-    );
+    let mut spectrum = XanesSpectrum::new(params.edge, atomic_number, edge_energy, params.clone());
 
     // Generate energy grid
     spectrum.generate_energy_grid()?;
@@ -736,10 +727,9 @@ pub fn calculate_xanes(
             }
 
             // Calculate XANES at this energy point
-            match calculator.calculate_xanes(energy, &path_operator) {
-                Ok(mu) => mu,
-                Err(_) => 0.0, // Skip point on error
-            }
+            calculator
+                .calculate_xanes(energy, &path_operator)
+                .unwrap_or(0.0)
         })
         .collect();
 

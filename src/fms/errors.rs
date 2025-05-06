@@ -21,35 +21,35 @@ pub enum FmsError {
     /// Error when matrix operations fail
     #[error("Matrix operation error: {0}")]
     MatrixError(String),
-    
+
     /// Error when the matrix dimensions are incompatible
     #[error("Matrix dimension mismatch: {0}")]
     DimensionMismatch(String),
-    
+
     /// Error when the matrix solver fails to converge
     #[error("Solver failed to converge: {0}")]
     ConvergenceError(String),
-    
+
     /// Error when iterative solver method fails
     #[error("Iterative solver failed: {0}")]
     IterationFailed(String),
-    
+
     /// Error when parameters are invalid
     #[error("Invalid parameter: {0}")]
     InvalidParameter(String),
-    
+
     /// Error when the FMS radius is too small
     #[error("FMS radius too small: {0}")]
     RadiusTooSmall(String),
-    
+
     /// Error from the atoms module
     #[error("Atom error: {0}")]
     AtomError(String),
-    
+
     /// Error from the scattering module
     #[error("Scattering error: {0}")]
     ScatteringError(String),
-    
+
     /// General calculation error
     #[error("Calculation error: {0}")]
     CalculationError(String),

@@ -14,12 +14,11 @@ All rights reserved.
 //! It includes functionality to compute k-space EXAFS chi(k), perform Fourier transforms
 //! to r-space, and apply various corrections like many-body effects and Debye-Waller factors.
 
-use num_complex::Complex64;
 use std::f64::consts::PI;
 
 use crate::atoms::{AtomicStructure, Result as AtomResult};
 use crate::path::{Path, PathFinder, PathFinderConfig};
-use crate::scattering::{ScatteringMatrixResults, ScatteringResults};
+use crate::scattering::ScatteringResults;
 use crate::utils::constants::HARTREE_TO_EV;
 
 /// Enumeration of grid types for EXAFS calculations
@@ -682,7 +681,7 @@ pub fn calculate_exafs(
 fn calculate_path_contribution(
     path: &Path,
     k: &f64,
-    energy: f64,
+    _energy: f64,
     structure: &AtomicStructure,
     phase_shifts: &ScatteringResults,
     params: &ExafsParameters,
@@ -892,7 +891,7 @@ pub fn apply_window(k_values: &[f64], chi_k: &[f64], window: WindowFunction) -> 
     for (i, &k) in k_values.iter().enumerate() {
         let normalized_k = (k - k_min) / range;
         // Ensure normalized_k is between 0 and 1 (handle edge cases)
-        let safe_normalized_k = normalized_k.max(0.0).min(1.0);
+        let safe_normalized_k = normalized_k.clamp(0.0, 1.0);
         let window_value = calculate_window_value(safe_normalized_k, window);
         // Ensure window value is non-negative
         let safe_window_value = window_value.max(0.0);
@@ -1113,8 +1112,7 @@ pub fn apply_backscattering_window(mut exafs_data: ExafsData, _nearest_neighbor:
     let sigma = range / 4.0; // Adjusted for good backscattering emphasis
 
     // Apply the window to chi(k)
-    for i in 0..exafs_data.chi_k.len() {
-        let k = k_values[i];
+    for (i, &k) in k_values.iter().enumerate().take(exafs_data.chi_k.len()) {
         let window = f64::exp(-(k - k_center).powi(2) / (2.0 * sigma * sigma));
         exafs_data.chi_k[i] *= window;
     }
@@ -1153,9 +1151,7 @@ pub fn apply_multiple_scattering_window(
     let k_cutoff = 4.0; // Empirical cutoff point
 
     // Apply the window to chi(k)
-    for i in 0..exafs_data.chi_k.len() {
-        let k = k_values[i];
-
+    for (i, &k) in k_values.iter().enumerate().take(exafs_data.chi_k.len()) {
         // Smoothly attenuate low-k region
         let attenuation = if k < k_cutoff {
             (k / k_cutoff).powi(2)
@@ -1317,8 +1313,8 @@ pub fn fourier_transform(
         let phase_correction = 0.5; // Å
 
         // Shift the r_values by the phase correction
-        for i in 0..r_values.len() {
-            r_values[i] -= phase_correction;
+        for r_value in &mut r_values {
+            *r_value -= phase_correction;
         }
     }
 

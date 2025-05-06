@@ -18,8 +18,8 @@ use crate::scattering::ScatteringMatrixResults;
 use crate::utils::linear_algebra::{faer_to_ndarray, ndarray_to_faer};
 use ndarray::Array2;
 use num_complex::Complex64;
-use std::ops::Mul;
 use rayon::prelude::*;
+use std::ops::Mul;
 
 /// FMS matrix types
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -155,8 +155,8 @@ impl<'a> FmsMatrix<'a> {
         // We'll use a parallel iterator to create the matrix directly
         if total_size > 1000 {
             // Use parallel_chunks method for better performance
-            let chunk_size = 64;  // Process 64 rows at a time
-            
+            let _chunk_size = 64; // Process 64 rows at a time
+
             // Calculate the matrix in parallel using chunks
             let updates: Vec<(usize, usize, Complex64)> = (0..total_size)
                 .into_par_iter()
@@ -168,7 +168,7 @@ impl<'a> FmsMatrix<'a> {
                     row_updates
                 })
                 .collect();
-            
+
             // Apply the updates to the result matrix
             for (i, j, value) in updates {
                 result_faer[(i, j)] += value; // Add the update value to identity matrix
@@ -203,7 +203,7 @@ impl<'a> FmsMatrix<'a> {
     ) -> Result<Array2<Complex64>> {
         // Get dimensions
         let (rows, cols) = matrix.dim();
-        
+
         // Implement proper filtering to include only atoms within the FMS radius
         // This is a placeholder implementation for now
         let filtered_matrix = match matrix_type {
@@ -211,22 +211,22 @@ impl<'a> FmsMatrix<'a> {
                 // For Green's function (propagator), we'll filter based on distance
                 // between atoms in the future implementation
                 matrix.clone()
-            },
+            }
             FmsMatrixType::TMatrix => {
                 // For T-matrix, we may want to apply different filtering criteria
                 matrix.clone()
-            },
-            FmsMatrixType::Full => {
+            }
+            _ => {
                 // For the full matrix, we'll apply combined filtering
                 matrix.clone()
             }
         };
-        
+
         // If the matrix is large, use parallel processing for the clone operation
         if rows * cols > 10000 {
             // Create a parallel version with the same dimensions using a similar approach
             let mut parallel_result = Array2::<Complex64>::zeros((rows, cols));
-            
+
             // Use parallel iterators to create a list of updates
             let updates: Vec<(usize, usize, Complex64)> = (0..rows)
                 .into_par_iter()
@@ -238,15 +238,15 @@ impl<'a> FmsMatrix<'a> {
                     row_updates
                 })
                 .collect();
-            
+
             // Apply all updates to the result matrix
             for (i, j, value) in updates {
                 parallel_result[(i, j)] = value;
             }
-            
+
             return Ok(parallel_result);
         }
-        
+
         // For smaller matrices, just return the cloned result
         Ok(filtered_matrix)
     }
@@ -271,15 +271,15 @@ impl<'a> FmsMatrix<'a> {
         // Get the pre-calculated Green's function matrix
         let green_matrix = &scattering_matrices.green_matrix;
         let (rows, cols) = green_matrix.dim();
-        
+
         // In a future implementation, we'll add curved-wave corrections and other
         // physical effects to the free electron Green's function
-        
+
         // For large matrices, use parallel processing
         if rows * cols > 10000 {
             // Create a new result matrix with the same dimensions
             let mut result = Array2::<Complex64>::zeros((rows, cols));
-            
+
             // Use parallel iterators to create a list of updates
             let updates: Vec<(usize, usize, Complex64)> = (0..rows)
                 .into_par_iter()
@@ -293,15 +293,15 @@ impl<'a> FmsMatrix<'a> {
                     row_updates
                 })
                 .collect();
-            
+
             // Apply all updates to the result matrix
             for (i, j, value) in updates {
                 result[(i, j)] = value;
             }
-            
+
             return Ok(result);
         }
-        
+
         // For smaller matrices, just clone the original
         Ok(green_matrix.clone())
     }
