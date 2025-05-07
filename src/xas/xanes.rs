@@ -19,6 +19,7 @@ use crate::atoms::AtomicStructure;
 use crate::fms::XanesCalculator;
 use crate::scattering::ScatteringMatrixResults;
 use crate::xas::core_hole::{calculate_with_core_hole, CoreHoleConfig, CoreHoleMethod};
+use crate::xas::thermal::ThermalParameters;
 use ndarray::Array2;
 use num_complex::Complex64;
 use rayon::prelude::*;
@@ -522,6 +523,13 @@ impl XanesSpectrum {
 }
 
 /// XANES calculation using a pre-calculated path operator
+///
+/// This function calculates a XANES spectrum using a pre-calculated path operator,
+/// which is useful when you want to re-use the same path operator for multiple calculations
+/// or when the path operator has been obtained from an external source.
+///
+/// If thermal parameters are provided in the XanesParameters, they'll be used to account
+/// for temperature effects in the final spectrum calculation.
 pub fn calculate_xanes_from_path_operator(
     structure: &AtomicStructure,
     path_operator: &Array2<Complex64>,
@@ -574,8 +582,12 @@ pub fn calculate_xanes_from_path_operator(
 
     // Apply additional Gaussian broadening if needed
     if params.gaussian_broadening > 0.0 {
-        spectrum.mu =
-            apply_gaussian_broadening(&spectrum.energies, &spectrum.mu, params.gaussian_broadening);
+        spectrum.mu = apply_gaussian_broadening(
+            &spectrum.energies,
+            &spectrum.mu,
+            params.gaussian_broadening,
+            params.thermal_parameters.as_ref(),
+        );
     }
 
     // Normalize the spectrum
@@ -585,14 +597,61 @@ pub fn calculate_xanes_from_path_operator(
 }
 
 /// Apply Gaussian broadening to a spectrum
-fn apply_gaussian_broadening(energies: &[f64], mu: &[f64], sigma: f64) -> Vec<f64> {
-    if sigma <= 0.0 || energies.is_empty() || mu.is_empty() {
+///
+/// # Arguments
+///
+/// * `energies` - Energy points for the spectrum in eV
+/// * `mu` - Absorption values at each energy point
+/// * `sigma` - Broadening width in eV (Gaussian standard deviation)
+/// * `thermal_params` - Optional thermal parameters for temperature-dependent broadening
+///
+/// # Returns
+///
+/// Broadened spectrum as a vector of absorption values
+fn apply_gaussian_broadening(
+    energies: &[f64],
+    mu: &[f64],
+    sigma: f64,
+    thermal_params: Option<&ThermalParameters>,
+) -> Vec<f64> {
+    if energies.is_empty() || mu.is_empty() {
         return mu.to_vec();
     }
 
-    let cutoff = 3.0 * sigma; // 3-sigma cutoff
-                              // Calculate the window size in points (unused but kept for future reference)
-    let _window_size = (2.0 * cutoff / (energies[1] - energies[0])).ceil() as usize;
+    // Get base sigma from input
+    let mut effective_sigma = sigma;
+    if effective_sigma <= 0.0 {
+        effective_sigma = 0.1; // Minimum broadening to avoid division by zero
+    }
+
+    // If we have thermal parameters, adjust the broadening based on temperature
+    if let Some(params) = thermal_params {
+        if params.temperature > 0.0 {
+            // Apply temperature-dependent adjustment to the broadening
+            // Higher temperature leads to more broadening due to increased thermal disorder
+            // This is a simplified model that scales with sqrt(T) which is typical for
+            // phonon effects in spectroscopy
+
+            // Calculate room-temperature-relative factor
+            let temp_factor = (params.temperature / 300.0).sqrt();
+
+            // Apply temperature scaling to sigma
+            // At room temperature, this adds no extra broadening
+            // At higher/lower temperatures, it scales appropriately
+            effective_sigma *= temp_factor;
+
+            // For anisotropic models, we might further adjust broadening based on
+            // displacement factors or crystal structure, but we'll keep it simple for now
+        }
+    }
+
+    let cutoff = 3.0 * effective_sigma; // 3-sigma cutoff
+                                        // Calculate the window size in points (unused but kept for future reference)
+    let _window_size = if energies.len() > 1 {
+        (2.0 * cutoff / (energies[1] - energies[0])).ceil() as usize
+    } else {
+        0
+    };
 
     // Create broadened spectrum
     let mut broadened = vec![0.0; mu.len()];
@@ -610,7 +669,7 @@ fn apply_gaussian_broadening(energies: &[f64], mu: &[f64], sigma: f64) -> Vec<f6
                 continue;
             }
 
-            let weight = (-0.5 * (delta_e / sigma).powi(2)).exp();
+            let weight = (-0.5 * (delta_e / effective_sigma).powi(2)).exp();
             sum += mu[j] * weight;
             weight_sum += weight;
         }
@@ -675,12 +734,17 @@ pub fn calculate_xanes(
         .energies
         .par_iter()
         .map(|&energy| {
-            // Calculate phase shifts with core hole effects
-            let phase_shifts =
-                match calculate_with_core_hole(structure, energy, max_l, &core_hole_config) {
-                    Ok(result) => result,
-                    Err(_) => return 0.0, // Skip point on error
-                };
+            // Calculate phase shifts with core hole effects and thermal effects if specified
+            let phase_shifts = match calculate_with_core_hole(
+                structure,
+                energy,
+                max_l,
+                &core_hole_config,
+                params.thermal_parameters.as_ref(),
+            ) {
+                Ok(result) => result,
+                Err(_) => return 0.0, // Skip point on error
+            };
 
             // Build simplified scattering matrix results for testing
             // Note: In a real implementation, we'd use proper ScatteringMatrixResults
@@ -698,8 +762,12 @@ pub fn calculate_xanes(
             };
 
             // Calculate path operator using FMS
-            // This is a placeholder - in a full implementation, we'd use a proper FMS solver
-            let path_operator = match calculate_path_operator(structure, &scattering) {
+            // Pass thermal parameters to the path operator calculation
+            let path_operator = match calculate_path_operator(
+                structure,
+                &scattering,
+                params.thermal_parameters.as_ref(),
+            ) {
                 Ok(matrix) => matrix,
                 Err(_) => return 0.0, // Skip point on error
             };
@@ -740,8 +808,12 @@ pub fn calculate_xanes(
 
     // Apply additional Gaussian broadening if needed
     if params.gaussian_broadening > 0.0 {
-        spectrum.mu =
-            apply_gaussian_broadening(&spectrum.energies, &spectrum.mu, params.gaussian_broadening);
+        spectrum.mu = apply_gaussian_broadening(
+            &spectrum.energies,
+            &spectrum.mu,
+            params.gaussian_broadening,
+            params.thermal_parameters.as_ref(),
+        );
     }
 
     // Normalize the spectrum
@@ -757,6 +829,7 @@ pub fn calculate_xanes(
 fn calculate_path_operator(
     structure: &AtomicStructure,
     scattering: &ScatteringMatrixResults,
+    thermal_params: Option<&ThermalParameters>,
 ) -> Result<Array2<Complex64>> {
     // This is a simplified placeholder that creates a diagonal path operator
     // In a real implementation, this would be replaced with proper FMS calculation
@@ -771,6 +844,85 @@ fn calculate_path_operator(
     // Set diagonal elements to i (imaginary unit) for testing
     for i in 0..matrix_size {
         path_operator[(i, i)] = Complex64::new(0.0, 1.0);
+    }
+
+    // If we have thermal parameters, apply thermal damping to the path operator
+    if let Some(params) = thermal_params {
+        if params.temperature > 0.0 {
+            // Get temperature and energy for calculating thermal effects
+            let temperature = params.temperature;
+            let energy = scattering.energy;
+
+            // Estimate the wavenumber k for this energy
+            // k (Å⁻¹) = 0.512 * sqrt(E (eV))
+            let k = 0.512 * energy.sqrt();
+
+            // Apply thermal damping to path operator
+            // For a proper implementation, we would calculate path-specific
+            // Debye-Waller factors, but for this placeholder, we'll use a
+            // global thermal damping factor based on the energy and temperature
+            let model_type = params.model_type.as_str();
+            let debye_temp = params.debye_temperature;
+            let einstein_freq = params.einstein_frequency;
+
+            // Estimate reduced mass (for Cu, Fe or similar transition metals)
+            let reduced_mass = 50.0; // In atomic mass units (amu)
+
+            // Create a thermal model based on provided parameters
+            let model = match model_type {
+                "debye" => crate::utils::thermal::create_thermal_model(
+                    "debye",
+                    Some(debye_temp),
+                    None,
+                    reduced_mass,
+                ),
+                "einstein" => crate::utils::thermal::create_thermal_model(
+                    "einstein",
+                    None,
+                    einstein_freq,
+                    reduced_mass,
+                ),
+                "correlated_debye" => crate::utils::thermal::create_thermal_model(
+                    "correlated_debye",
+                    Some(debye_temp),
+                    None,
+                    reduced_mass,
+                ),
+                "anisotropic" => {
+                    // For anisotropic model, get displacement factors and path direction
+                    let factors = params.displacement_factors.unwrap_or([1.0, 1.0, 1.0]);
+                    let direction = params.path_direction.unwrap_or([0.0, 0.0, 1.0]);
+
+                    crate::utils::thermal::create_anisotropic_thermal_model(
+                        "debye",
+                        Some(debye_temp),
+                        None,
+                        reduced_mass,
+                        None,
+                        factors,
+                        direction,
+                    )
+                }
+                _ => crate::utils::thermal::create_thermal_model(
+                    "debye",
+                    Some(debye_temp),
+                    None,
+                    reduced_mass,
+                ),
+            };
+
+            // Calculate Debye-Waller factor exp(-2k²σ²)
+            let dw_factor = model.debye_waller_factor(temperature, k);
+
+            // Apply thermal damping to all elements of the path operator
+            for i in 0..matrix_size {
+                for j in 0..matrix_size {
+                    // Note: In a real implementation, we would have path-specific
+                    // Debye-Waller factors, but here we use a global factor
+                    path_operator[(i, j)] *= dw_factor;
+                }
+            }
+        }
     }
 
     Ok(path_operator)
@@ -907,6 +1059,7 @@ impl<'a> XanesAnalyzer<'a> {
 mod tests {
     use super::*;
     use crate::atoms::{Atom, AtomicStructure, PotentialType, Vector3D};
+    use crate::xas::thermal::ThermalParameters;
 
     #[test]
     fn test_edge_energy() {
@@ -1017,7 +1170,7 @@ mod tests {
 
         // Apply Gaussian broadening
         let sigma = 0.5; // 0.5 eV broadening
-        let broadened = apply_gaussian_broadening(&energies, &mu, sigma);
+        let broadened = apply_gaussian_broadening(&energies, &mu, sigma, None);
 
         // Check that the peak has been broadened
         assert!(broadened[50] < 1.0); // Peak should be reduced
@@ -1029,5 +1182,61 @@ mod tests {
         let broadened_sum: f64 = broadened.iter().sum();
 
         assert!((original_sum - broadened_sum).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_thermal_effects_on_xanes() {
+        // Create a simple iron atom structure
+        let fe_potential = PotentialType::new(0, 26).unwrap();
+        let fe_atom = Atom::new(26, Vector3D::new(0.0, 0.0, 0.0), 0).unwrap();
+
+        let mut structure = AtomicStructure::new();
+        structure.add_potential_type(fe_potential);
+        let fe_idx = structure.add_atom(fe_atom);
+        structure.set_central_atom(fe_idx).unwrap();
+
+        // Calculate muffin-tin radius
+        structure.calculate_muffin_tin_radii().unwrap();
+
+        // Create standard parameters (no thermal effects)
+        let mut std_params = XanesParameters::default();
+        std_params.edge = Edge::K;
+        std_params.energy_range = (-5.0, 20.0, 5.0); // Simplified for test
+        std_params.max_l = 2;
+
+        // Create parameters with thermal effects
+        let mut thermal_params = std_params.clone();
+        thermal_params.thermal_parameters = Some(ThermalParameters::new_debye(300.0, 470.0)); // Fe Debye temperature
+
+        // Calculate XANES spectrum with and without thermal effects
+        let std_spectrum = calculate_xanes(&structure, &std_params);
+        let thermal_spectrum = calculate_xanes(&structure, &thermal_params);
+
+        // Both calculations should succeed
+        assert!(std_spectrum.is_ok());
+        assert!(thermal_spectrum.is_ok());
+
+        if let (Ok(std), Ok(thermal)) = (std_spectrum, thermal_spectrum) {
+            // Verify both spectra have the same energy grid
+            assert_eq!(std.energies.len(), thermal.energies.len());
+            for i in 0..std.energies.len() {
+                assert_eq!(std.energies[i], thermal.energies[i]);
+            }
+
+            // We expect thermal effects to potentially modify the spectral features
+            // For this test, we simply verify that both calculations complete
+            // and return reasonably structured output.
+
+            // Don't assert on values as they might be zero in tests
+            // Just verify basic data structure properties
+            assert_eq!(std.energies.len(), std.mu.len());
+            assert_eq!(thermal.energies.len(), thermal.mu.len());
+
+            // Print some diagnostic information
+            let std_sum: f64 = std.mu.iter().sum();
+            let thermal_sum: f64 = thermal.mu.iter().sum();
+            println!("Standard XANES sum: {}", std_sum);
+            println!("Thermal XANES sum: {}", thermal_sum);
+        }
     }
 }

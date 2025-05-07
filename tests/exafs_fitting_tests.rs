@@ -193,12 +193,7 @@ fn test_theoretical_spectrum_calculation() {
         debye_waller_factors: vec![],
         s02: 0.9,
         energy_shift: 0.0,
-        thermal_parameters: Some(thermal::ThermalParameters {
-            temperature: 300.0,
-            model_type: "debye".to_string(),
-            debye_temperature: 300.0,
-            einstein_frequency: None,
-        }),
+        thermal_parameters: Some(thermal::ThermalParameters::new_debye(300.0, 300.0)),
         r_max: 6.0,
     };
 
@@ -312,12 +307,7 @@ fn test_fit_quality_calculation() {
         debye_waller_factors: vec![],
         s02: 0.9,
         energy_shift: 0.0,
-        thermal_parameters: Some(thermal::ThermalParameters {
-            temperature: 300.0,
-            model_type: "debye".to_string(),
-            debye_temperature: 300.0,
-            einstein_frequency: None,
-        }),
+        thermal_parameters: Some(thermal::ThermalParameters::new_debye(300.0, 300.0)),
         r_max: 6.0,
     };
 

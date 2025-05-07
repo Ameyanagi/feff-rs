@@ -445,8 +445,12 @@ fn calculate_fallback_phase_shift(
 #[cfg(test)]
 mod tests {
     use super::*;
+    // These are used in other tests in this module
+    #[allow(unused_imports)]
     use crate::atoms::{Atom, AtomicStructure, Vector3D};
-    use crate::utils::constants::{BOHR_TO_ANGSTROM, HARTREE_TO_EV};
+    #[allow(unused_imports)]
+    use crate::utils::constants::BOHR_TO_ANGSTROM;
+    use crate::utils::constants::HARTREE_TO_EV;
 
     #[test]
     fn test_fallback_phase_shift() {

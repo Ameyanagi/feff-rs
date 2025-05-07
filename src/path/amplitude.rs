@@ -186,7 +186,7 @@ fn calculate_complex_amplitude(
         // Get scattering amplitude and phase for this atom
         let scatterer_pot_index = scatterer.potential_type() as usize;
 
-        if scattering_results.phase_shifts[scatterer_pot_index].len() > 0 {
+        if !scattering_results.phase_shifts[scatterer_pot_index].is_empty() {
             // Add phase from the scatterer (l=0 for s-wave scattering)
             let scatterer_phase = scattering_results.phase_shifts[scatterer_pot_index][0];
             complex_amplitude *= Complex64::from_polar(1.0, 2.0 * scatterer_phase.re);

@@ -35,6 +35,8 @@ pub struct PotentialType {
     spin: f64,
     /// Model atom index (which atom is the representative for this potential)
     model_atom_index: Option<usize>,
+    /// Debye temperature in Kelvin (used for thermal calculations)
+    debye_temperature: Option<f64>,
 }
 
 impl PotentialType {
@@ -63,6 +65,7 @@ impl PotentialType {
             atom_count: 0,
             spin: 0.0,
             model_atom_index: None,
+            debye_temperature: None,
         })
     }
 
@@ -164,6 +167,47 @@ impl PotentialType {
     /// Set the model atom index
     pub fn set_model_atom_index(&mut self, index: usize) {
         self.model_atom_index = Some(index);
+    }
+
+    /// Get the Debye temperature
+    pub fn debye_temperature(&self) -> Option<f64> {
+        // If a value is explicitly set, use that
+        if let Some(temp) = self.debye_temperature {
+            return Some(temp);
+        }
+
+        // Otherwise, return a reasonable estimate based on element type
+        match self.atomic_number {
+            // Values for common elements (from experimental data)
+            1 => Some(800.0),  // H
+            6 => Some(2230.0), // C (diamond)
+            7 => Some(350.0),  // N
+            8 => Some(525.0),  // O
+            13 => Some(428.0), // Al
+            14 => Some(645.0), // Si
+            26 => Some(470.0), // Fe
+            29 => Some(315.0), // Cu
+            47 => Some(225.0), // Ag
+            79 => Some(170.0), // Au
+
+            // Element groups - approximate values
+            // Light elements (generally higher Debye temperatures)
+            z if z < 10 => Some(500.0),
+
+            // Transition metals
+            z if (21..=30).contains(&z) => Some(400.0),
+
+            // Heavy elements (generally lower Debye temperatures)
+            z if z > 50 => Some(200.0),
+
+            // Default for other elements
+            _ => Some(300.0),
+        }
+    }
+
+    /// Set the Debye temperature
+    pub fn set_debye_temperature(&mut self, temperature: f64) {
+        self.debye_temperature = Some(temperature);
     }
 
     /// Get the atomic weight from the database

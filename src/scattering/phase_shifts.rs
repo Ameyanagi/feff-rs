@@ -246,6 +246,7 @@ pub fn calculate_phase_shifts(
                 max_l: cached_result.max_l,
                 phase_shifts: cached_result.phase_shifts.clone(),
                 t_matrices: cached_result.t_matrices.clone(),
+                temperature: cached_result.temperature,
             });
         }
     }
@@ -326,6 +327,7 @@ pub fn calculate_phase_shifts(
         max_l,
         phase_shifts,
         t_matrices,
+        temperature: None, // Not temperature-dependent
     };
 
     // Store in structure cache only for medium-to-large systems

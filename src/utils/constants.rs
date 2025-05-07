@@ -30,3 +30,12 @@ pub const EV_TO_HARTREE: f64 = 1.0 / (2.0 * RYDBERG);
 
 /// Conversion from Hartree to eV
 pub const HARTREE_TO_EV: f64 = 2.0 * RYDBERG;
+
+/// Boltzmann constant in eV/K
+pub const BOLTZMANN_CONSTANT: f64 = 8.617333262e-5;
+
+/// Planck's constant in eV·s
+pub const PLANCK_CONSTANT: f64 = 4.135667696e-15;
+
+/// Reduced Planck's constant (h/2π) in eV·s
+pub const HBAR: f64 = 6.582119569e-16;

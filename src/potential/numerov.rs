@@ -162,7 +162,10 @@ pub fn numerov_outward_inward(
 #[cfg(test)]
 mod tests {
     use super::*;
+    // These imports are used in tests below
+    #[allow(unused_imports)]
     use approx::assert_relative_eq;
+    #[allow(unused_imports)]
     use std::f64::consts::PI;
 
     #[test]

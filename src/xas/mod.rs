@@ -19,6 +19,7 @@ mod exafs;
 mod fitting;
 pub mod thermal;
 mod xanes;
+mod xanes_thermal;
 
 use crate::atoms::Result as AtomResult;
 use crate::scattering::ScatteringMatrixResults;
@@ -34,6 +35,10 @@ pub use fitting::{
 pub use xanes::{
     calculate_xanes, calculate_xanes_from_path_operator, Edge, XanesAnalyzer, XanesParameters,
     XanesSpectrum,
+};
+pub use xanes_thermal::{
+    apply_thermal_corrections, calculate_temperature_series, calculate_xanes_debye_waller_factor,
+    create_temperature_dependent_xanes, XanesThermalCorrectionParams,
 };
 
 /// Calculate XAS spectrum using multiple scattering theory

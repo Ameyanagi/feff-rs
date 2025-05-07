@@ -14,36 +14,17 @@ All rights reserved.
 //! and their effects on XAS calculations. It includes models for
 //! calculating temperature-dependent Debye-Waller factors, including:
 //!
-//! - Debye model: Standard model for vibrations in crystalline solids. It models
-//!   the collective lattice vibrations using a continuous distribution of vibrational
-//!   modes. Appropriate for crystalline materials with simple structures.
-//!
-//! - Einstein model: Localized vibration model where atoms are treated as independent
-//!   harmonic oscillators with a single vibrational frequency. This model is better
-//!   for stiff bonds and localized vibrations in complex structures.
-//!
+//! - Debye model: Standard model for vibrations in crystalline solids
+//! - Einstein model: Localized vibration model, better for stiff bonds
 //! - Correlated Debye model: Enhanced model that accounts for correlation
-//!   between atomic vibrations, particularly important for EXAFS. This model
-//!   considers that atoms connected by chemical bonds move in a correlated manner,
-//!   which significantly affects EXAFS amplitude reduction.
-//!
+//!   between atomic vibrations, particularly important for EXAFS
 //! - Anisotropic model: Advanced model for handling directional thermal
-//!   vibrations in non-cubic materials. This model accounts for the different
-//!   amplitudes of thermal vibrations along different crystallographic directions,
-//!   which is essential for accurately modeling thermal effects in materials with
-//!   lower symmetry (tetragonal, hexagonal, orthorhombic, etc.).
-//!
-//! The thermal models provide both mean-square displacement (MSD) calculations and
-//! Debye-Waller factor calculations, which are used to account for the dampening
-//! of XAS signals due to thermal disorder.
+//!   vibrations in non-cubic materials
 
 // Physical constants
 // Values from CODATA 2018
-#[allow(dead_code)]
 const BOLTZMANN_CONSTANT: f64 = 8.617333262e-5; // eV/K
-#[allow(dead_code)]
 const HBAR: f64 = 6.582119569e-16; // eV·s
-#[allow(dead_code)]
 const AMU_TO_EV: f64 = 9.3149410242e-10; // Convert amu·Å² to eV·s²
 
 /// Trait for thermal models used to calculate Debye-Waller factors
@@ -373,8 +354,7 @@ impl CorrelatedDebyeModel {
 
         // For longer paths, correlation decreases
         // Use an exponential decay model with a characteristic length
-        // Make characteristic length shorter to ensure correlation drops more quickly with distance
-        let characteristic_length = 3.0; // Å (reduced from 5.0 to make correlation drop faster)
+        let characteristic_length = 5.0; // Å
         let correlation =
             0.8 * (-(path_distance - typical_first_shell) / characteristic_length).exp();
 
@@ -504,10 +484,6 @@ impl ThermalModel for CorrelatedDebyeModel {
 /// * `einstein_frequency` - Einstein frequency in meV
 /// * `reduced_mass` - Reduced mass in atomic mass units (amu)
 /// * `path_distance` - Path distance in Å (only used for correlated_debye model)
-///
-/// # Returns
-///
-/// A box containing the appropriate thermal model
 /// Create a thermal model from parameters
 ///
 /// # Arguments
@@ -547,8 +523,8 @@ pub fn create_thermal_model(
             Box::new(AnisotropicThermalModel::new_from_debye(
                 debye_temp,
                 reduced_mass,
-                [1.0, 1.0, 1.0], // Isotropic by default
-                [0.0, 0.0, 1.0], // Default path direction along z-axis
+                [1.0, 1.0, 1.0],  // Isotropic by default
+                [0.0, 0.0, 1.0],  // Default path direction along z-axis
             ))
         }
         _ => {
@@ -563,31 +539,15 @@ pub fn create_thermal_model(
 ///
 /// This model accounts for direction-dependent thermal vibrations,
 /// essential for correctly modeling thermal effects in materials
-/// with anisotropic crystal structures (tetragonal, hexagonal, etc.).
-///
-/// In cubic materials, thermal vibrations have equal amplitude in all directions.
-/// However, in lower-symmetry materials, atoms vibrate with different amplitudes
-/// along different crystallographic axes. This anisotropy affects XAS signals
-/// differently depending on the orientation of the absorber-scatterer pair
-/// relative to the crystal axes.
-///
-/// This implementation works by:
-/// 1. Starting with a base thermal model (Debye, Einstein, or Correlated Debye)
-/// 2. Applying direction-dependent scaling factors to adjust the vibration amplitudes
-/// 3. Projecting these anisotropic displacements onto specific scattering paths
-///
-/// For example, in a layered material like graphite, in-plane (x,y) vibrations
-/// are much smaller than out-of-plane (z) vibrations, resulting in different
-/// XAS dampening for paths that lie within the layers versus those that cross
-/// between layers.
+/// with anisotropic crystal structures.
 pub struct AnisotropicThermalModel {
     /// Base thermal model used for overall magnitude of vibrations
     base_model: Box<dyn ThermalModel>,
-
+    
     /// Direction-dependent scaling factors for thermal displacements
     /// Represented as [u_x, u_y, u_z] for the three principal crystal axes
     displacement_factors: [f64; 3],
-
+    
     /// Path direction in Cartesian coordinates (unit vector)
     path_direction: [f64; 3],
 }
@@ -612,11 +572,9 @@ impl AnisotropicThermalModel {
         path_direction: [f64; 3],
     ) -> Self {
         let base_model = Box::new(DebyeModel::new(debye_temperature, reduced_mass));
-
+        
         // Normalize path direction to ensure it's a unit vector
-        let norm =
-            (path_direction[0].powi(2) + path_direction[1].powi(2) + path_direction[2].powi(2))
-                .sqrt();
+        let norm = (path_direction[0].powi(2) + path_direction[1].powi(2) + path_direction[2].powi(2)).sqrt();
         let normalized_direction = if norm > 1e-10 {
             [
                 path_direction[0] / norm,
@@ -627,14 +585,14 @@ impl AnisotropicThermalModel {
             // Default to z-direction if path direction is too small
             [0.0, 0.0, 1.0]
         };
-
+        
         Self {
             base_model,
             displacement_factors,
             path_direction: normalized_direction,
         }
     }
-
+    
     /// Create a new anisotropic thermal model based on a Correlated Debye model
     ///
     /// # Arguments
@@ -660,11 +618,9 @@ impl AnisotropicThermalModel {
             reduced_mass,
             path_distance,
         ));
-
+        
         // Normalize path direction
-        let norm =
-            (path_direction[0].powi(2) + path_direction[1].powi(2) + path_direction[2].powi(2))
-                .sqrt();
+        let norm = (path_direction[0].powi(2) + path_direction[1].powi(2) + path_direction[2].powi(2)).sqrt();
         let normalized_direction = if norm > 1e-10 {
             [
                 path_direction[0] / norm,
@@ -674,14 +630,14 @@ impl AnisotropicThermalModel {
         } else {
             [0.0, 0.0, 1.0]
         };
-
+        
         Self {
             base_model,
             displacement_factors,
             path_direction: normalized_direction,
         }
     }
-
+    
     /// Create a new anisotropic thermal model based on an Einstein model
     ///
     /// # Arguments
@@ -701,11 +657,9 @@ impl AnisotropicThermalModel {
         path_direction: [f64; 3],
     ) -> Self {
         let base_model = Box::new(EinsteinModel::new(einstein_frequency, reduced_mass));
-
+        
         // Normalize path direction
-        let norm =
-            (path_direction[0].powi(2) + path_direction[1].powi(2) + path_direction[2].powi(2))
-                .sqrt();
+        let norm = (path_direction[0].powi(2) + path_direction[1].powi(2) + path_direction[2].powi(2)).sqrt();
         let normalized_direction = if norm > 1e-10 {
             [
                 path_direction[0] / norm,
@@ -715,31 +669,18 @@ impl AnisotropicThermalModel {
         } else {
             [0.0, 0.0, 1.0]
         };
-
+        
         Self {
             base_model,
             displacement_factors,
             path_direction: normalized_direction,
         }
     }
-
+    
     /// Calculate the directional weighting factor for the current path
     ///
     /// This projects the anisotropic displacement factors onto the path direction
     /// to determine how much the thermal vibrations affect this specific path.
-    /// The calculation works by weighting the displacement factors according to
-    /// how closely they align with the path direction, using a projection formula.
-    ///
-    /// For example, in a layered material with enhanced z-axis vibrations:
-    /// - A path directly along the z-axis would experience the full effect of the z-displacement factor
-    /// - A path along the x-axis would primarily experience the x-displacement factor
-    /// - A path at 45° between axes would experience a weighted combination of both factors
-    ///
-    /// The primary calculation is based on the formula:
-    ///   weight = (u_x*n_x² + u_y*n_y² + u_z*n_z²)
-    /// where u_i are displacement factors and n_i are path direction components.
-    /// This effectively gives the projection of the anisotropic thermal ellipsoid
-    /// onto the specific path direction.
     ///
     /// # Returns
     ///
@@ -748,19 +689,23 @@ impl AnisotropicThermalModel {
         let ux = self.displacement_factors[0];
         let uy = self.displacement_factors[1];
         let uz = self.displacement_factors[2];
-
+        
         let nx = self.path_direction[0];
         let ny = self.path_direction[1];
         let nz = self.path_direction[2];
-
+        
         // Project displacement factors onto path direction
         // Formula: (ux*nx^2 + uy*ny^2 + uz*nz^2) + small cross-terms
         let primary_terms = ux * nx * nx + uy * ny * ny + uz * nz * nz;
-
+        
         // Add small cross-terms for mixed directions (typically small)
         // These terms account for off-diagonal elements in the thermal ellipsoid
-        let cross_terms = 0.1 * ((ux + uy) * nx * ny + (ux + uz) * nx * nz + (uy + uz) * ny * nz);
-
+        let cross_terms = 0.1 * (
+            (ux + uy) * nx * ny +
+            (ux + uz) * nx * nz +
+            (uy + uz) * ny * nz
+        );
+        
         // Ensure weight is positive and reasonable
         (primary_terms + cross_terms).max(0.5).min(2.0)
     }
@@ -770,10 +715,10 @@ impl ThermalModel for AnisotropicThermalModel {
     fn mean_square_displacement(&self, temperature: f64) -> f64 {
         // Get base mean-square displacement from underlying model
         let base_msd = self.base_model.mean_square_displacement(temperature);
-
+        
         // Scale by directional factor
         let directional_weight = self.calculate_directional_weight();
-
+        
         // Apply direction-dependent scaling
         base_msd * directional_weight
     }
@@ -826,8 +771,8 @@ pub fn create_thermal_model_with_path(
             Box::new(AnisotropicThermalModel::new_from_debye(
                 debye_temp,
                 reduced_mass,
-                [1.0, 1.0, 1.0], // Isotropic by default
-                [0.0, 0.0, 1.0], // Default path direction along z-axis
+                [1.0, 1.0, 1.0],  // Isotropic by default
+                [0.0, 0.0, 1.0],  // Default path direction along z-axis
             ))
         }
         _ => {
@@ -841,29 +786,7 @@ pub fn create_thermal_model_with_path(
 /// Create an anisotropic thermal model with crystal direction information
 ///
 /// This function creates a thermal model that accounts for direction-dependent
-/// thermal vibrations, which is essential for non-cubic materials (tetragonal,
-/// hexagonal, orthorhombic, etc.) where thermal vibrations have different
-/// amplitudes along different crystallographic directions.
-///
-/// The anisotropic model uses a base thermal model (Debye, Einstein, or Correlated Debye)
-/// to determine the overall temperature dependence and magnitude of thermal vibrations,
-/// then applies direction-specific scaling factors to model anisotropy. The resulting
-/// mean-square displacements are projected onto specific scattering paths to accurately
-/// predict how thermal disorder affects XAS signals for different absorber-scatterer pairs.
-///
-/// # Physical meaning of parameters
-///
-/// * Base model parameters (Debye temperature, Einstein frequency) determine the overall
-///   magnitude and temperature dependence of thermal vibrations.
-///
-/// * Displacement factors [u_x, u_y, u_z] represent the relative amplitudes of thermal
-///   vibrations along each crystallographic axis. For example, [1.0, 1.0, 2.0] indicates
-///   that vibrations along the z-axis are twice as large as those along x and y axes.
-///   These values are dimensionless ratios, with 1.0 representing the isotropic reference.
-///   
-/// * Path direction [d_x, d_y, d_z] is a unit vector representing the orientation of the
-///   absorber-scatterer pair relative to the crystal axes. This determines how the
-///   anisotropic thermal vibrations project onto the specific scattering path.
+/// thermal vibrations, which is essential for non-cubic materials.
 ///
 /// # Arguments
 ///
@@ -874,23 +797,6 @@ pub fn create_thermal_model_with_path(
 /// * `path_distance` - Path distance in Å (used for correlated model)
 /// * `displacement_factors` - Direction-dependent scaling factors [u_x, u_y, u_z]
 /// * `path_direction` - Unit vector representing the path direction [d_x, d_y, d_z]
-///
-/// # Examples
-///
-/// ```no_run
-/// use feff_rs::utils::thermal::create_anisotropic_thermal_model;
-/// // Create an anisotropic model for a layered material (like graphite)
-/// // with enhanced out-of-plane vibrations
-/// let _layered_material_model = create_anisotropic_thermal_model(
-///     "debye",               // Use Debye model as the base
-///     Some(420.0),          // Debye temperature for graphite
-///     None,                 // No Einstein frequency needed
-///     12.0,                 // Reduced mass for C-C
-///     Some(1.42),           // C-C bond distance
-///     [1.0, 1.0, 2.5],      // Much larger vibrations along z-axis
-///     [1.0, 0.0, 0.0]       // Path along x-axis (in-plane)
-/// );
-/// ```
 ///
 /// # Returns
 ///
@@ -1028,150 +934,6 @@ mod tests {
     }
 
     #[test]
-    fn test_anisotropic_model() {
-        // Test anisotropic thermal model with a Debye base model
-        let temp = 300.0;
-        let debye_temp = 315.0;
-        let mass = 63.546; // Cu
-
-        // Create models for comparison
-        let isotropic = AnisotropicThermalModel::new_from_debye(
-            debye_temp,
-            mass,
-            [1.0, 1.0, 1.0], // Equal in all directions
-            [0.0, 0.0, 1.0], // Z-direction path
-        );
-
-        // Create model with anisotropy in the z-direction
-        let z_enhanced = AnisotropicThermalModel::new_from_debye(
-            debye_temp,
-            mass,
-            [0.8, 0.8, 1.5], // Enhanced z-direction vibration
-            [0.0, 0.0, 1.0], // Z-direction path
-        );
-
-        // Create model with anisotropy in the x-direction
-        let x_enhanced = AnisotropicThermalModel::new_from_debye(
-            debye_temp,
-            mass,
-            [1.5, 0.8, 0.8], // Enhanced x-direction vibration
-            [0.0, 0.0, 1.0], // Z-direction path
-        );
-
-        // Measure displacements
-        let msd_isotropic = isotropic.mean_square_displacement(temp);
-        let msd_z_enhanced = z_enhanced.mean_square_displacement(temp);
-        let msd_x_enhanced = x_enhanced.mean_square_displacement(temp);
-
-        // For a z-direction path:
-        // 1. Enhanced z-vibration should increase displacement
-        assert!(msd_z_enhanced > msd_isotropic);
-        // 2. Enhanced x-vibration should have minimal effect on z-direction path
-        assert!(msd_x_enhanced < msd_z_enhanced);
-
-        // Now test with path in x-direction
-        let z_enhanced_x_path = AnisotropicThermalModel::new_from_debye(
-            debye_temp,
-            mass,
-            [0.8, 0.8, 1.5], // Enhanced z-direction vibration
-            [1.0, 0.0, 0.0], // X-direction path
-        );
-
-        let x_enhanced_x_path = AnisotropicThermalModel::new_from_debye(
-            debye_temp,
-            mass,
-            [1.5, 0.8, 0.8], // Enhanced x-direction vibration
-            [1.0, 0.0, 0.0], // X-direction path
-        );
-
-        let msd_z_enhanced_x_path = z_enhanced_x_path.mean_square_displacement(temp);
-        let msd_x_enhanced_x_path = x_enhanced_x_path.mean_square_displacement(temp);
-
-        // For an x-direction path, enhanced x-vibration should have more effect
-        assert!(msd_x_enhanced_x_path > msd_z_enhanced_x_path);
-
-        // Test temperature dependence
-        let high_temp = 600.0;
-        let msd_high_temp = isotropic.mean_square_displacement(high_temp);
-        let msd_low_temp = isotropic.mean_square_displacement(temp);
-
-        // Higher temperature should lead to larger displacements
-        assert!(msd_high_temp > msd_low_temp);
-
-        // Test Debye-Waller factor
-        let dw_factor = isotropic.debye_waller_factor(temp, 10.0);
-        assert!(dw_factor > 0.0 && dw_factor < 1.0);
-    }
-
-    #[test]
-    fn test_anisotropic_model_with_correlated_debye() {
-        // Test anisotropic thermal model with a Correlated Debye base model
-        let temp = 300.0;
-        let debye_temp = 315.0;
-        let mass = 63.546; // Cu
-        let short_distance = 2.5; // First shell distance
-        let long_distance = 7.0; // Distant shell
-
-        // Create models for first shell with different displacement factors
-        let isotropic_short = AnisotropicThermalModel::new_from_correlated_debye(
-            debye_temp,
-            mass,
-            short_distance,
-            [1.0, 1.0, 1.0], // Equal in all directions
-            [0.0, 0.0, 1.0], // Z-direction path
-        );
-
-        let anisotropic_short = AnisotropicThermalModel::new_from_correlated_debye(
-            debye_temp,
-            mass,
-            short_distance,
-            [0.7, 0.7, 1.6], // Enhanced z-direction vibration
-            [0.0, 0.0, 1.0], // Z-direction path
-        );
-
-        // Create models for distant shell with different displacement factors
-        let isotropic_long = AnisotropicThermalModel::new_from_correlated_debye(
-            debye_temp,
-            mass,
-            long_distance,
-            [1.0, 1.0, 1.0], // Equal in all directions
-            [0.0, 0.0, 1.0], // Z-direction path
-        );
-
-        let anisotropic_long = AnisotropicThermalModel::new_from_correlated_debye(
-            debye_temp,
-            mass,
-            long_distance,
-            [0.7, 0.7, 1.6], // Enhanced z-direction vibration
-            [0.0, 0.0, 1.0], // Z-direction path
-        );
-
-        // Measure displacements
-        let msd_iso_short = isotropic_short.mean_square_displacement(temp);
-        let msd_aniso_short = anisotropic_short.mean_square_displacement(temp);
-        let msd_iso_long = isotropic_long.mean_square_displacement(temp);
-        let msd_aniso_long = anisotropic_long.mean_square_displacement(temp);
-
-        // Test anisotropy effects
-        assert!(msd_aniso_short > msd_iso_short); // Anisotropy in z should increase MSD for z-path
-        assert!(msd_aniso_long > msd_iso_long); // Same for distant shell
-
-        // Test path length effects (lower correlation for longer paths)
-        assert!(msd_iso_long > msd_iso_short); // Longer paths should have larger MSD
-        assert!(msd_aniso_long > msd_aniso_short); // Same for anisotropic model
-
-        // Test the Debye-Waller factor
-        let wavenumber = 10.0; // Å⁻¹
-        let dw_short = isotropic_short.debye_waller_factor(temp, wavenumber);
-        let dw_long = isotropic_long.debye_waller_factor(temp, wavenumber);
-
-        // Longer paths should have smaller DW factors (more dampening)
-        assert!(dw_short > dw_long);
-        assert!(dw_short > 0.0 && dw_short < 1.0);
-        assert!(dw_long > 0.0 && dw_long < 1.0);
-    }
-
-    #[test]
     fn test_model_factory() {
         // Test creating Debye model from factory
         let debye_model = create_thermal_model("debye", Some(315.0), None, 63.546);
@@ -1185,37 +947,15 @@ mod tests {
         let corr_debye_model = create_thermal_model("correlated_debye", Some(315.0), None, 63.546);
         let sigma_sq_corr_debye = corr_debye_model.mean_square_displacement(300.0);
 
-        // Test creating Anisotropic model from factory
-        let anisotropic_model = create_thermal_model("anisotropic", Some(315.0), None, 63.546);
-        let sigma_sq_anisotropic = anisotropic_model.mean_square_displacement(300.0);
-
         // Test creating model with path-extended factory
         let corr_debye_with_path =
             create_thermal_model_with_path("correlated_debye", Some(315.0), None, 63.546, 5.0);
         let sigma_sq_with_path = corr_debye_with_path.mean_square_displacement(300.0);
-
-        // Test creating anisotropic model with dedicated factory
-        let anisotropic_custom = create_anisotropic_thermal_model(
-            "debye",
-            Some(315.0),
-            None,
-            63.546,
-            None,
-            [1.2, 0.9, 0.9], // Enhanced x-direction
-            [1.0, 0.0, 0.0], // X-direction path
-        );
-        let sigma_sq_aniso_custom = anisotropic_custom.mean_square_displacement(300.0);
 
         // All should give reasonable values
         assert!(sigma_sq_debye > 0.0 && sigma_sq_debye < 0.01);
         assert!(sigma_sq_einstein > 0.0 && sigma_sq_einstein < 0.01);
         assert!(sigma_sq_corr_debye > 0.0 && sigma_sq_corr_debye < 0.01);
         assert!(sigma_sq_with_path > 0.0 && sigma_sq_with_path < 0.01);
-        assert!(sigma_sq_anisotropic > 0.0 && sigma_sq_anisotropic < 0.01);
-        assert!(sigma_sq_aniso_custom > 0.0 && sigma_sq_aniso_custom < 0.01);
-
-        // Due to custom displacement factors aligned with path direction,
-        // the custom anisotropic model should have higher displacement
-        assert!(sigma_sq_aniso_custom > sigma_sq_debye);
     }
 }

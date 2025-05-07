@@ -23,6 +23,7 @@ mod muffin_tin_wavefunction;
 mod numerov;
 mod radial_wavefunction;
 mod scf;
+pub mod thermal;
 
 pub use atom_solver::{AtomSolver, AtomSolverConfig};
 pub use errors::{PotentialError, Result};
@@ -31,6 +32,7 @@ pub use muffin_tin::{GridType, MuffinTinPotential, MuffinTinPotentialResult};
 pub use muffin_tin_wavefunction::{AtomicWavefunctions, MuffinTinWavefunction};
 pub use radial_wavefunction::RadialWavefunction;
 pub use scf::{MixingMethod, SelfConsistencyResult};
+pub use thermal::calculate_potential_with_thermal_effects;
 
 #[cfg(test)]
 mod tests {

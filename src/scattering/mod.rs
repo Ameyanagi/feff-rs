@@ -19,6 +19,7 @@ mod phase_shifts;
 mod phase_shifts_from_wavefunctions;
 mod potential_phase_shifts;
 mod scattering_matrices;
+mod temperature_dependent_phase_shifts;
 
 use crate::atoms::errors::AtomError;
 use crate::atoms::{AtomicStructure, Result as AtomResult};
@@ -32,6 +33,10 @@ pub use potential_phase_shifts::calculate_phase_shifts_from_potential;
 pub use scattering_matrices::{
     calculate_scattering_matrices,
     calculate_scattering_matrices_legacy as calculate_scattering_matrices_old,
+};
+pub use temperature_dependent_phase_shifts::{
+    apply_thermal_corrections_to_path, calculate_path_thermal_phase_shift,
+    calculate_temperature_dependent_phase_shifts,
 };
 
 /// Calculate phase shifts using the specified method
@@ -87,7 +92,12 @@ pub fn calculate_phase_shifts_with_method(
                 max_l,
                 phase_shifts,
                 t_matrices,
+                temperature: None, // Not temperature-dependent
             })
+        }
+        PhaseShiftMethod::TemperatureDependent(temperature) => {
+            // Use temperature-dependent phase shift calculation
+            calculate_temperature_dependent_phase_shifts(structure, energy, max_l, temperature)
         }
     }
 }
@@ -109,6 +119,9 @@ pub struct ScatteringResults {
     /// Scattering T-matrices for each potential type
     /// First index: potential type index
     pub t_matrices: Vec<ndarray::Array2<Complex64>>,
+
+    /// Temperature in Kelvin (if temperature-dependent calculations were used)
+    pub temperature: Option<f64>,
 }
 
 /// Method to use for phase shift calculations
@@ -122,6 +135,9 @@ pub enum PhaseShiftMethod {
 
     /// Use wavefunction-based calculation with muffin-tin potentials (most accurate)
     WavefunctionBased,
+
+    /// Use temperature-dependent calculation with specified temperature (in Kelvin)
+    TemperatureDependent(f64),
 }
 
 /// Results from scattering matrix calculations

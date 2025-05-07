@@ -51,8 +51,8 @@ impl PathLeg {
     ///
     /// A new PathLeg with the calculated distance between atoms
     pub fn new(from_atom: usize, to_atom: usize, structure: &AtomicStructure) -> Self {
-        let from_pos = structure.atom(from_atom).unwrap().position().clone();
-        let to_pos = structure.atom(to_atom).unwrap().position().clone();
+        let from_pos = *structure.atom(from_atom).unwrap().position();
+        let to_pos = *structure.atom(to_atom).unwrap().position();
         let length = (to_pos - from_pos).length();
 
         Self {
@@ -299,4 +299,90 @@ impl Hash for Path {
         self.atom_sequence.hash(state);
         ((rounded_length * 1000.0) as i64).hash(state);
     }
+}
+
+/// Scattering path amplitude factors
+#[derive(Debug, Clone)]
+pub struct PathAmplitude {
+    /// Effective scattering amplitude for this path
+    pub amplitude: f64,
+    /// Phase shift for this path
+    pub phase: f64,
+    /// Mean free path factor
+    pub mean_free_path_factor: f64,
+    /// Debye-Waller factor
+    pub debye_waller_factor: f64,
+    /// Temperature in Kelvin (if thermal effects are included)
+    pub temperature: Option<f64>,
+    /// Mean-square relative displacement (σ²) in Å²
+    pub mean_square_displacement: Option<f64>,
+}
+
+impl Default for PathAmplitude {
+    fn default() -> Self {
+        Self {
+            amplitude: 1.0,
+            phase: 0.0,
+            mean_free_path_factor: 1.0,
+            debye_waller_factor: 1.0,
+            temperature: None,
+            mean_square_displacement: None,
+        }
+    }
+}
+
+/// Thermal parameters for a specific scattering path
+#[derive(Debug, Clone)]
+pub struct PathThermalParameters {
+    /// Temperature in Kelvin
+    pub temperature: f64,
+    /// Type of thermal model used
+    pub model_type: String,
+    /// Mean-square relative displacement (σ²) in Å²
+    pub mean_square_displacement: f64,
+    /// Model-specific parameters
+    pub model_parameters: PathThermalModelParameters,
+}
+
+/// Model-specific thermal parameters for different models
+#[derive(Debug, Clone)]
+pub enum PathThermalModelParameters {
+    /// Debye model parameters
+    Debye {
+        /// Debye temperature in Kelvin
+        debye_temperature: f64,
+        /// Reduced mass in atomic mass units (amu)
+        reduced_mass: f64,
+    },
+    /// Einstein model parameters
+    Einstein {
+        /// Einstein frequency in meV
+        einstein_frequency: f64,
+        /// Reduced mass in atomic mass units (amu)
+        reduced_mass: f64,
+    },
+    /// Correlated Debye model parameters
+    CorrelatedDebye {
+        /// Debye temperature in Kelvin
+        debye_temperature: f64,
+        /// Reduced mass in atomic mass units (amu)
+        reduced_mass: f64,
+        /// Path distance in Å
+        path_distance: f64,
+        /// Correlation factor (0.0-1.0)
+        correlation: f64,
+    },
+    /// Anisotropic model parameters
+    Anisotropic {
+        /// Underlying thermal model (Debye, Einstein, etc.)
+        base_model: String,
+        /// Debye temperature in Kelvin
+        debye_temperature: f64,
+        /// Einstein frequency in meV (if using Einstein base)
+        einstein_frequency: Option<f64>,
+        /// Direction-dependent displacement factors [u_x, u_y, u_z]
+        displacement_factors: [f64; 3],
+        /// Path direction in Cartesian coordinates [d_x, d_y, d_z]
+        path_direction: [f64; 3],
+    },
 }

@@ -1,0 +1,3 @@
+too-many-arguments-threshold = 9
+allow-expect-in-tests = true
+doc-valid-idents = ["feff-rs", "FEFF10", "eV", "Å", "σ²"]

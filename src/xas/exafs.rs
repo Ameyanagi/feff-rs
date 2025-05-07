@@ -584,6 +584,125 @@ impl ExafsParameters {
             r_max: 10.0,
         }
     }
+
+    /// Create new EXAFS parameters with optimized thermal parameters for a material type
+    ///
+    /// This function uses the optimized thermal parameters for EXAFS based on
+    /// the material type (metal, oxide, etc.) and temperature.
+    ///
+    /// # Arguments
+    ///
+    /// * `edge` - Absorption edge (K, L₁, L₂, L₃, etc.)
+    /// * `edge_energy` - Edge energy in eV
+    /// * `k_range` - Range of k values in Å^-1 (min, max)
+    /// * `k_step` - Step size in k-space in Å^-1
+    /// * `material_type` - Type of material ("metal", "oxide", "layered", etc.)
+    /// * `temperature` - Temperature in Kelvin
+    /// * `debye_temperature` - Debye temperature in Kelvin (use None for default)
+    /// * `include_anharmonic` - Whether to include anharmonic effects (important above ~500K)
+    ///
+    /// # Returns
+    ///
+    /// A new `ExafsParameters` instance with optimized thermal effects for EXAFS
+    pub fn new_with_material_temperature(
+        edge: crate::xas::Edge,
+        edge_energy: f64,
+        k_range: (f64, f64),
+        k_step: f64,
+        material_type: &str,
+        temperature: f64,
+        debye_temperature: Option<f64>,
+        include_anharmonic: bool,
+    ) -> Self {
+        // Create energy grid
+        let energy_grid = EnergyGrid::new(edge_energy, k_range.0, k_range.1, k_step);
+
+        // Create optimized thermal parameters for EXAFS
+        let thermal_params = crate::xas::thermal::create_exafs_thermal_parameters(
+            material_type,
+            temperature,
+            debye_temperature.unwrap_or(match material_type.to_lowercase().as_str() {
+                "metal" | "metallic" => 350.0,
+                "oxide" | "ceramic" => 450.0,
+                "layered" | "2d" => 400.0,
+                "molecular" | "organic" => 200.0,
+                _ => 300.0, // Default
+            }),
+            include_anharmonic,
+        );
+
+        Self {
+            edge,
+            energy_range: energy_grid,
+            k_range,
+            r_range: (0.0, 6.0, 0.02),
+            fermi_energy: 0.0,
+            max_path_length: 8.0,
+            max_legs: 4,
+            max_paths: 50,
+            min_importance: 0.01,
+            debye_waller_factors: vec![0.003], // Default static Debye-Waller factor (as fallback)
+            s02: 0.9,                          // Default amplitude reduction factor
+            energy_shift: 0.0,
+            thermal_parameters: Some(thermal_params),
+            r_max: 10.0,
+        }
+    }
+
+    /// Create new EXAFS parameters with thermal parameters for a specific material
+    ///
+    /// This function uses the thermal parameters optimized for a specific material
+    /// based on its chemical composition and structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `edge` - Absorption edge (K, L₁, L₂, L₃, etc.)
+    /// * `edge_energy` - Edge energy in eV
+    /// * `k_range` - Range of k values in Å^-1 (min, max)
+    /// * `k_step` - Step size in k-space in Å^-1
+    /// * `material` - Material name ("Fe", "Cu", "Fe2O3", "TiO2", etc.)
+    /// * `temperature` - Temperature in Kelvin
+    /// * `custom_debye_temp` - Optional override for the Debye temperature
+    ///
+    /// # Returns
+    ///
+    /// A new `ExafsParameters` instance with material-specific thermal effects
+    pub fn new_for_material(
+        edge: crate::xas::Edge,
+        edge_energy: f64,
+        k_range: (f64, f64),
+        k_step: f64,
+        material: &str,
+        temperature: f64,
+        custom_debye_temp: Option<f64>,
+    ) -> Self {
+        // Create energy grid
+        let energy_grid = EnergyGrid::new(edge_energy, k_range.0, k_range.1, k_step);
+
+        // Create material-specific thermal parameters
+        let thermal_params = crate::xas::thermal::create_material_thermal_parameters(
+            material,
+            temperature,
+            custom_debye_temp,
+        );
+
+        Self {
+            edge,
+            energy_range: energy_grid,
+            k_range,
+            r_range: (0.0, 6.0, 0.02),
+            fermi_energy: 0.0,
+            max_path_length: 8.0,
+            max_legs: 4,
+            max_paths: 50,
+            min_importance: 0.01,
+            debye_waller_factors: vec![0.003], // Default static Debye-Waller factor (as fallback)
+            s02: 0.9,                          // Default amplitude reduction factor
+            energy_shift: 0.0,
+            thermal_parameters: Some(thermal_params),
+            r_max: 10.0,
+        }
+    }
 }
 
 /// Calculate EXAFS for a given structure
@@ -622,8 +741,24 @@ pub fn calculate_exafs(
     // Initialize EXAFS data
     let mut exafs_data = ExafsData::new(params.energy_range.clone());
 
-    // Pre-calculate phase shifts for efficiency
-    let phase_shifts = crate::scattering::calculate_phase_shifts(structure, 0.0, 3)?;
+    // Pre-calculate phase shifts for efficiency with thermal effects if available
+    let phase_shifts = match &params.thermal_parameters {
+        Some(thermal_params) if thermal_params.temperature > 0.0 => {
+            // Use temperature-dependent phase shifts
+            crate::scattering::calculate_phase_shifts_with_method(
+                structure,
+                exafs_data.grid.energies[exafs_data.grid.energies.len() / 2], // Use middle energy point
+                3,                                                            // max_l
+                crate::scattering::PhaseShiftMethod::TemperatureDependent(
+                    thermal_params.temperature,
+                ),
+            )?
+        }
+        _ => {
+            // Standard phase shifts without thermal effects
+            crate::scattering::calculate_phase_shifts(structure, 0.0, 3)?
+        }
+    };
 
     // Calculate EXAFS for each path at each energy point
     for (i, k) in exafs_data.grid.k_values.iter().enumerate() {
@@ -687,16 +822,30 @@ fn calculate_path_contribution(
         let reduced_mass =
             (absorber_z as f64 * scatterer_z as f64) / (absorber_z as f64 + scatterer_z as f64);
 
-        // Create thermal model
-        let thermal_model = create_thermal_model(
-            &thermal_params.model_type,
-            Some(thermal_params.debye_temperature),
-            thermal_params.einstein_frequency,
-            reduced_mass,
-        );
+        // Check if we have pair-specific parameters for this element pair
+        if let Some(pair_params) = thermal_params.get_pair_parameters(absorber_z, scatterer_z) {
+            // Use pair-specific thermal model with the global temperature
+            let thermal_model = create_thermal_model(
+                &pair_params.model_type,
+                Some(pair_params.debye_temperature),
+                pair_params.einstein_frequency,
+                reduced_mass,
+            );
 
-        // Calculate mean-square displacement
-        thermal_model.mean_square_displacement(thermal_params.temperature)
+            // Calculate mean-square displacement using pair-specific model
+            thermal_model.mean_square_displacement(thermal_params.temperature)
+        } else {
+            // Fall back to global thermal parameters
+            let thermal_model = create_thermal_model(
+                &thermal_params.model_type,
+                Some(thermal_params.debye_temperature),
+                thermal_params.einstein_frequency,
+                reduced_mass,
+            );
+
+            // Calculate mean-square displacement
+            thermal_model.mean_square_displacement(thermal_params.temperature)
+        }
     } else if params.debye_waller_factors.len() > path.atom_sequence.len() {
         // Use path-specific factors if available
         params.debye_waller_factors[path.atom_sequence.len() - 1]
@@ -738,22 +887,93 @@ fn calculate_path_contribution(
     if scatterer_pot_index < phase_shifts.phase_shifts.len()
         && !phase_shifts.phase_shifts[scatterer_pot_index].is_empty()
     {
-        // Use l=0 (s-wave) phase shift for simple approximation
-        let phase = phase_shifts.phase_shifts[scatterer_pot_index][0];
+        // Check if we need to apply additional thermal corrections to path-specific phase shifts
+        if let Some(thermal_params) = &params.thermal_parameters {
+            if thermal_params.temperature > 0.0 && phase_shifts.temperature.is_none() {
+                // If we're using thermal parameters but don't have temperature-dependent
+                // phase shifts, apply path-specific corrections
 
-        // Amplitude is related to the imaginary part of the phase
-        scattering_amplitude = phase.norm();
+                // Get the path indices for correlation effects
+                let path_indices = &path.atom_sequence;
 
-        // Phase is the real part (for simple approximation)
-        total_phase_shift = phase.arg();
+                // Apply thermal corrections to phase shifts for this specific path
+                let corrected_shifts = crate::scattering::apply_thermal_corrections_to_path(
+                    structure,
+                    path_indices,
+                    &phase_shifts.phase_shifts,
+                    _energy,
+                    3, // max_l
+                    thermal_params,
+                );
+
+                // Use l=0 (s-wave) phase shift with thermal correction
+                let phase = corrected_shifts[scatterer_pot_index][0];
+
+                // Amplitude is related to the imaginary part of the phase
+                scattering_amplitude = phase.norm();
+
+                // Phase is the real part (for simple approximation)
+                total_phase_shift = phase.arg();
+            } else {
+                // If we already have temperature-dependent phase shifts, use them directly
+                // Use l=0 (s-wave) phase shift for simple approximation
+                let phase = phase_shifts.phase_shifts[scatterer_pot_index][0];
+
+                // Amplitude is related to the imaginary part of the phase
+                scattering_amplitude = phase.norm();
+
+                // Phase is the real part (for simple approximation)
+                total_phase_shift = phase.arg();
+            }
+        } else {
+            // Standard case without thermal effects
+            // Use l=0 (s-wave) phase shift for simple approximation
+            let phase = phase_shifts.phase_shifts[scatterer_pot_index][0];
+
+            // Amplitude is related to the imaginary part of the phase
+            scattering_amplitude = phase.norm();
+
+            // Phase is the real part (for simple approximation)
+            total_phase_shift = phase.arg();
+        }
     }
 
     // Photoelectron mean free path (MFP) depends on energy/wavenumber
     // Simple approximation: λ(k) = k₀ + αk (parameters depend on material)
-    // Typical values for metals at room temperature
-    let lambda_0 = 4.0; // Baseline MFP in Å (low energy limit)
-    let lambda_slope = 0.6; // How fast MFP increases with k
-    let lambda = lambda_0 + lambda_slope * k; // Mean free path in Å
+
+    // Check if we have thermal parameters to modify the mean free path
+    let (lambda_0, lambda_slope) = if let Some(thermal_params) = &params.thermal_parameters {
+        if thermal_params.temperature > 0.0 {
+            // Temperature affects mean free path due to increased electron-phonon scattering
+            // At higher temperatures, mean free path decreases due to more scattering events
+
+            // Normalized temperature (relative to room temperature 300K)
+            let temp_factor = thermal_params.temperature / 300.0;
+
+            // Decrease mean free path with increasing temperature
+            // For most materials, MFP approximately follows a 1/T dependence
+            let base_lambda_0 = 4.0; // Baseline MFP in Å (low energy limit)
+            let base_lambda_slope = 0.6; // How fast MFP increases with k
+
+            // Apply temperature correction
+            // Use a weaker dependence than strict 1/T to match experimental observations
+            let temp_scaling = 1.0 / temp_factor.sqrt();
+
+            (
+                base_lambda_0 * temp_scaling.min(1.5), // Cap the improvement for low T
+                base_lambda_slope * temp_scaling.min(1.3), // Less effect on the slope
+            )
+        } else {
+            // Standard values at room temperature
+            (4.0, 0.6)
+        }
+    } else {
+        // Standard values at room temperature
+        (4.0, 0.6)
+    };
+
+    // Calculate mean free path in Å
+    let lambda = lambda_0 + lambda_slope * k;
 
     let mfp_factor = f64::exp(-2.0 * path_length / lambda);
 

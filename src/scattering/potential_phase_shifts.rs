@@ -161,6 +161,7 @@ pub fn calculate_phase_shifts_from_potential(
         max_l,
         phase_shifts,
         t_matrices,
+        temperature: None, // Not temperature-dependent
     })
 }
 

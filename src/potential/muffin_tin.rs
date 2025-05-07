@@ -21,6 +21,7 @@ use super::exchange_correlation::{
 use super::scf::{calculate_density_error, mix_densities, DensityMixer, MixingMethod};
 use crate::atoms::AtomicStructure;
 use crate::utils::constants::{BOHR_TO_ANGSTROM, HARTREE_TO_EV};
+use crate::utils::thermal::{self, ThermalModel};
 use rayon::prelude::*;
 use std::time::Instant;
 
@@ -171,6 +172,12 @@ pub struct MuffinTinPotential<'a> {
     z_star: Option<f64>,
     /// Mixing method for self-consistency
     mixing_method: MixingMethod,
+    /// Temperature in Kelvin for temperature-dependent effects
+    temperature: f64,
+    /// Thermal model type for temperature-dependent calculations
+    thermal_model_type: Option<String>,
+    /// Thermal model parameter (Debye temperature or Einstein frequency)
+    thermal_model_parameter: Option<f64>,
 }
 
 impl<'a> MuffinTinPotential<'a> {
@@ -229,6 +236,9 @@ impl<'a> MuffinTinPotential<'a> {
             self_energy_shift: 0.0,
             z_star: None,
             mixing_method: MixingMethod::Linear(0.3), // Default 30% linear mixing
+            temperature: 0.0,                         // Default to 0K (no thermal effects)
+            thermal_model_type: None,
+            thermal_model_parameter: None,
         })
     }
 
@@ -283,6 +293,126 @@ impl<'a> MuffinTinPotential<'a> {
         self
     }
 
+    /// Set the temperature for temperature-dependent effects
+    ///
+    /// # Arguments
+    ///
+    /// * `temperature` - Temperature in Kelvin
+    ///
+    /// # Returns
+    ///
+    /// Self for method chaining
+    pub fn set_temperature(&mut self, temperature: f64) -> &mut Self {
+        self.temperature = temperature.max(0.0); // Ensure non-negative temperature
+        self
+    }
+
+    /// Set the thermal model parameters for temperature-dependent calculations
+    ///
+    /// # Arguments
+    ///
+    /// * `model_type` - Type of thermal model ("debye", "einstein", or "correlated_debye")
+    /// * `parameter` - Thermal model parameter (Debye temperature or Einstein frequency)
+    ///
+    /// # Returns
+    ///
+    /// Self for method chaining
+    pub fn set_thermal_model(&mut self, model_type: &str, parameter: f64) -> Result<&mut Self> {
+        // Validate model type
+        let valid_types = ["debye", "einstein", "correlated_debye", "anisotropic"];
+        let model_type_lower = model_type.to_lowercase();
+
+        if !valid_types.contains(&model_type_lower.as_str()) {
+            return Err(PotentialError::Generic(format!(
+                "Invalid thermal model type: {}. Valid types are: {:?}",
+                model_type, valid_types
+            )));
+        }
+
+        // Validate parameter value
+        if parameter <= 0.0 {
+            return Err(PotentialError::Generic(format!(
+                "Invalid thermal model parameter: {}. Must be positive",
+                parameter
+            )));
+        }
+
+        self.thermal_model_type = Some(model_type_lower);
+        self.thermal_model_parameter = Some(parameter);
+        Ok(self)
+    }
+
+    /// Create a thermal model from the current parameters
+    ///
+    /// # Returns
+    ///
+    /// A boxed thermal model instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if thermal model parameters are not set or invalid
+    fn create_thermal_model(&self) -> Result<Box<dyn ThermalModel>> {
+        // Need both model type and parameter
+        let model_type = self
+            .thermal_model_type
+            .as_ref()
+            .ok_or_else(|| PotentialError::Generic("Thermal model type not set".to_string()))?;
+
+        let parameter = self.thermal_model_parameter.ok_or_else(|| {
+            PotentialError::Generic("Thermal model parameter not set".to_string())
+        })?;
+
+        // Default reduced mass (can be refined later)
+        // For simplicity, use the absorber atomic mass
+        let central_atom = self.structure.central_atom().ok_or_else(|| {
+            PotentialError::InvalidStructure("No central atom defined".to_string())
+        })?;
+
+        let atomic_number = central_atom.atomic_number();
+        let reduced_mass = atomic_number as f64; // Approximate reduced mass as atomic number
+
+        // Create the appropriate thermal model
+        let model = match model_type.as_str() {
+            "debye" => thermal::create_thermal_model("debye", Some(parameter), None, reduced_mass),
+            "einstein" => {
+                thermal::create_thermal_model("einstein", None, Some(parameter), reduced_mass)
+            }
+            "correlated_debye" => {
+                // For correlated Debye, we need path distance
+                // Use a reasonable default for atomic potential calculations
+                let path_distance = 2.5; // Typical first-shell distance in Å
+                thermal::create_thermal_model_with_path(
+                    "correlated_debye",
+                    Some(parameter),
+                    None,
+                    reduced_mass,
+                    path_distance,
+                )
+            }
+            "anisotropic" => {
+                // For anisotropic model, we use default displacement factors and direction
+                // These could be parameterized further in the future
+                thermal::create_anisotropic_thermal_model(
+                    "debye",
+                    Some(parameter),
+                    None,
+                    reduced_mass,
+                    Some(2.5),       // Default path distance
+                    [1.0, 1.0, 1.0], // Isotropic displacement factors
+                    [0.0, 0.0, 1.0], // Default z-direction
+                )
+            }
+            _ => {
+                return Err(PotentialError::Generic(format!(
+                    "Unsupported thermal model type: {}",
+                    model_type
+                )));
+            }
+        };
+
+        Ok(model)
+    }
+
     /// Calculate the muffin-tin potential
     pub fn calculate(&self) -> Result<MuffinTinPotentialResult> {
         // Create the radial grid for each potential type
@@ -297,6 +427,18 @@ impl<'a> MuffinTinPotential<'a> {
         // Add exchange-correlation potential
         self.calculate_xc_potential(&mut result)?;
 
+        // Apply temperature-dependent effects if temperature is set
+        if self.temperature > 0.0 {
+            // Only apply if thermal model is configured
+            if self.thermal_model_type.is_some() && self.thermal_model_parameter.is_some() {
+                // Apply thermal smearing to account for atomic vibrations
+                self.apply_thermal_smearing(&mut result)?;
+
+                // In the future, also apply thermal expansion effects:
+                // self.apply_thermal_expansion(&mut result)?;
+            }
+        }
+
         // Calculate energy levels by solving Schrödinger equation
         self.calculate_energy_levels(&mut result)?;
 
@@ -304,6 +446,329 @@ impl<'a> MuffinTinPotential<'a> {
         self.calculate_fermi_energy(&mut result)?;
 
         Ok(result)
+    }
+
+    /// Apply thermal smearing to the potentials to account for atomic vibrations
+    ///
+    /// This simulates the effect of thermal vibrations on the potential by
+    /// applying a Gaussian smearing with width proportional to the
+    /// mean-square displacement from the thermal model.
+    ///
+    /// # Arguments
+    ///
+    /// * `result` - The potential result to modify
+    ///
+    /// # Returns
+    ///
+    /// Result indicating success or an error
+    fn apply_thermal_smearing(&self, result: &mut MuffinTinPotentialResult) -> Result<()> {
+        // Skip if temperature is negligible
+        if self.temperature <= 50.0 {
+            return Ok(());
+        }
+
+        // Create thermal model
+        let thermal_model = match self.create_thermal_model() {
+            Ok(model) => model,
+            Err(_) => return Ok(()), // Skip if model creation fails
+        };
+
+        // Calculate mean-square displacement at current temperature
+        let msd = thermal_model.mean_square_displacement(self.temperature);
+
+        // Apply smoothing to both potentials and densities
+        for pot_idx in 0..self.structure.potential_type_count() {
+            // Get the potential values
+            let potential = result.potentials[pot_idx].clone(); // Clone to avoid borrowing issues
+            let density = result.densities[pot_idx].clone();
+            let grid = &result.radial_grid;
+
+            // Determine smoothing width based on √MSD (in Å)
+            // For potentials, a smaller factor is often appropriate
+            let sigma_pot = (msd * 0.7).sqrt(); // ~70% of full vibration amplitude for potentials
+            let sigma_den = msd.sqrt(); // Full vibration amplitude for densities
+
+            // Skip if negligible smearing
+            if sigma_pot < 0.01 {
+                continue;
+            }
+
+            // For logarithmic grids, convolution requires special handling
+            // First, need to determine kernel size based on grid spacing
+
+            // Check if grid spacing is approximately uniform
+            let is_uniform = if grid.len() >= 3 {
+                let ratio1 = if grid[1] > 1e-10 {
+                    grid[2] / grid[1]
+                } else {
+                    1.0
+                };
+                let ratio2 = if grid[0] > 1e-10 {
+                    grid[1] / grid[0]
+                } else {
+                    1.0
+                };
+                (ratio1 - ratio2).abs() < 0.01 // Uniform if ratios are similar
+            } else {
+                true // Default to assuming uniform for very small grids
+            };
+
+            // Apply appropriate convolution based on grid type
+            if is_uniform && grid.len() >= 3 {
+                // For approximately uniform grids, use standard convolution
+                let dr = grid[1] - grid[0];
+                let kernel_size = (3.0 * sigma_pot / dr) as usize + 1;
+
+                // Create Gaussian convolution kernel for potential
+                let mut kernel_pot = vec![0.0; 2 * kernel_size + 1];
+                for i in 0..kernel_pot.len() {
+                    let r = (i as isize - kernel_size as isize) as f64 * dr;
+                    kernel_pot[i] = (-0.5 * (r / sigma_pot).powi(2)).exp();
+                }
+
+                // Normalize kernel
+                let kernel_sum: f64 = kernel_pot.iter().sum();
+                for k in kernel_pot.iter_mut() {
+                    *k /= kernel_sum;
+                }
+
+                // Apply convolution to potential
+                let mut smoothed_potential = vec![0.0; grid.len()];
+
+                for i in 0..grid.len() {
+                    let mut sum = 0.0;
+                    let mut weight_sum = 0.0;
+
+                    for j in 0..kernel_pot.len() {
+                        let idx = i as isize + (j as isize - kernel_size as isize);
+
+                        if idx >= 0 && idx < grid.len() as isize {
+                            sum += potential[idx as usize] * kernel_pot[j];
+                            weight_sum += kernel_pot[j];
+                        }
+                    }
+
+                    if weight_sum > 0.0 {
+                        smoothed_potential[i] = sum / weight_sum;
+                    } else {
+                        smoothed_potential[i] = potential[i];
+                    }
+                }
+
+                // Update potential
+                result.potentials[pot_idx] = smoothed_potential;
+
+                // Similar process for density, with appropriate sigma
+                let kernel_size_den = (3.0 * sigma_den / dr) as usize + 1;
+                let mut kernel_den = vec![0.0; 2 * kernel_size_den + 1];
+
+                for i in 0..kernel_den.len() {
+                    let r = (i as isize - kernel_size_den as isize) as f64 * dr;
+                    kernel_den[i] = (-0.5 * (r / sigma_den).powi(2)).exp();
+                }
+
+                // Normalize kernel
+                let kernel_sum: f64 = kernel_den.iter().sum();
+                for k in kernel_den.iter_mut() {
+                    *k /= kernel_sum;
+                }
+
+                // Apply convolution to density
+                let mut smoothed_density = vec![0.0; grid.len()];
+
+                for i in 0..grid.len() {
+                    let mut sum = 0.0;
+                    let mut weight_sum = 0.0;
+
+                    for j in 0..kernel_den.len() {
+                        let idx = i as isize + (j as isize - kernel_size_den as isize);
+
+                        if idx >= 0 && idx < grid.len() as isize {
+                            sum += density[idx as usize] * kernel_den[j];
+                            weight_sum += kernel_den[j];
+                        }
+                    }
+
+                    if weight_sum > 0.0 {
+                        smoothed_density[i] = sum / weight_sum;
+                    } else {
+                        smoothed_density[i] = density[i];
+                    }
+                }
+
+                // Update density
+                result.densities[pot_idx] = smoothed_density;
+            } else {
+                // For non-uniform grids (like logarithmic), use a different approach
+                // We'll interpolate to a temporary uniform grid, convolve, and interpolate back
+
+                // Create a temporary uniform grid
+                let r_min = grid
+                    .iter()
+                    .filter(|&&r| r > 1e-10)
+                    .fold(f64::MAX, |a, &b| a.min(b));
+                let r_max = *grid.last().unwrap_or(&1.0);
+                let n_points = 1000; // Enough points for good resolution
+                let dr = (r_max - r_min) / (n_points - 1) as f64;
+
+                let mut temp_grid = vec![0.0; n_points];
+                for i in 0..n_points {
+                    temp_grid[i] = r_min + i as f64 * dr;
+                }
+
+                // Interpolate potential to uniform grid
+                let mut temp_potential = vec![0.0; n_points];
+                let mut temp_density = vec![0.0; n_points];
+
+                for i in 0..n_points {
+                    let r = temp_grid[i];
+
+                    // Find bracketing points in original grid
+                    let mut idx_low = 0;
+                    let mut idx_high = grid.len() - 1;
+
+                    for j in 0..grid.len() {
+                        if grid[j] >= r {
+                            idx_high = j;
+                            if j > 0 {
+                                idx_low = j - 1;
+                            }
+                            break;
+                        }
+                    }
+
+                    // Linear interpolation
+                    let r_low = grid[idx_low];
+                    let r_high = grid[idx_high];
+
+                    if r_high > r_low {
+                        let t = (r - r_low) / (r_high - r_low);
+
+                        let v_low = potential[idx_low];
+                        let v_high = potential[idx_high];
+                        temp_potential[i] = v_low + t * (v_high - v_low);
+
+                        let d_low = density[idx_low];
+                        let d_high = density[idx_high];
+                        temp_density[i] = d_low + t * (d_high - d_low);
+                    } else {
+                        // Fallback if grid points are too close
+                        temp_potential[i] = potential[idx_low];
+                        temp_density[i] = density[idx_low];
+                    }
+                }
+
+                // Apply convolution on uniform grid
+                let kernel_size = (3.0 * sigma_pot / dr) as usize + 1;
+
+                // Create Gaussian kernel for potential
+                let mut kernel_pot = vec![0.0; 2 * kernel_size + 1];
+                for i in 0..kernel_pot.len() {
+                    let r = (i as isize - kernel_size as isize) as f64 * dr;
+                    kernel_pot[i] = (-0.5 * (r / sigma_pot).powi(2)).exp();
+                }
+
+                // Normalize kernel
+                let kernel_sum: f64 = kernel_pot.iter().sum();
+                for k in kernel_pot.iter_mut() {
+                    *k /= kernel_sum;
+                }
+
+                // Apply convolution
+                let mut smoothed_temp_potential = vec![0.0; n_points];
+
+                for i in 0..n_points {
+                    let mut sum = 0.0;
+                    let mut weight_sum = 0.0;
+
+                    for j in 0..kernel_pot.len() {
+                        let idx = i as isize + (j as isize - kernel_size as isize);
+
+                        if idx >= 0 && idx < n_points as isize {
+                            sum += temp_potential[idx as usize] * kernel_pot[j];
+                            weight_sum += kernel_pot[j];
+                        }
+                    }
+
+                    if weight_sum > 0.0 {
+                        smoothed_temp_potential[i] = sum / weight_sum;
+                    } else {
+                        smoothed_temp_potential[i] = temp_potential[i];
+                    }
+                }
+
+                // Similar process for density
+                let kernel_size_den = (3.0 * sigma_den / dr) as usize + 1;
+                let mut kernel_den = vec![0.0; 2 * kernel_size_den + 1];
+
+                for i in 0..kernel_den.len() {
+                    let r = (i as isize - kernel_size_den as isize) as f64 * dr;
+                    kernel_den[i] = (-0.5 * (r / sigma_den).powi(2)).exp();
+                }
+
+                // Normalize kernel
+                let kernel_sum: f64 = kernel_den.iter().sum();
+                for k in kernel_den.iter_mut() {
+                    *k /= kernel_sum;
+                }
+
+                // Apply convolution
+                let mut smoothed_temp_density = vec![0.0; n_points];
+
+                for i in 0..n_points {
+                    let mut sum = 0.0;
+                    let mut weight_sum = 0.0;
+
+                    for j in 0..kernel_den.len() {
+                        let idx = i as isize + (j as isize - kernel_size_den as isize);
+
+                        if idx >= 0 && idx < n_points as isize {
+                            sum += temp_density[idx as usize] * kernel_den[j];
+                            weight_sum += kernel_den[j];
+                        }
+                    }
+
+                    if weight_sum > 0.0 {
+                        smoothed_temp_density[i] = sum / weight_sum;
+                    } else {
+                        smoothed_temp_density[i] = temp_density[i];
+                    }
+                }
+
+                // Interpolate smoothed values back to original grid
+                for i in 0..grid.len() {
+                    let r = grid[i];
+
+                    // Skip very small r values
+                    if r < r_min {
+                        continue;
+                    }
+
+                    // Find position in temporary grid
+                    let idx_f = (r - r_min) / dr;
+                    let idx_low = idx_f.floor() as usize;
+
+                    if idx_low >= n_points - 1 {
+                        // At or past the end of the grid
+                        result.potentials[pot_idx][i] = smoothed_temp_potential[n_points - 1];
+                        result.densities[pot_idx][i] = smoothed_temp_density[n_points - 1];
+                    } else {
+                        // Interpolate
+                        let t = idx_f - idx_low as f64;
+
+                        let v1 = smoothed_temp_potential[idx_low];
+                        let v2 = smoothed_temp_potential[idx_low + 1];
+                        result.potentials[pot_idx][i] = v1 + t * (v2 - v1);
+
+                        let d1 = smoothed_temp_density[idx_low];
+                        let d2 = smoothed_temp_density[idx_low + 1];
+                        result.densities[pot_idx][i] = d1 + t * (d2 - d1);
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Create radial grids for all potential types

@@ -220,7 +220,7 @@ impl<'a> XanesCalculator<'a> {
         let path_op_size = path_operator.shape()[0];
 
         // Calculate l_size (number of angular momentum components per atom) based on max_l
-        let l_size = ((self.max_l + 1) * (self.max_l + 1)) as usize;
+        let l_size = (self.max_l + 1) * (self.max_l + 1);
 
         // Calculate number of atoms in the FMS cluster
         let num_atoms = path_op_size / l_size;
@@ -329,7 +329,7 @@ impl<'a> XanesCalculator<'a> {
         let path_op_size = path_operator.shape()[0];
 
         // Calculate l_size (number of angular momentum components per atom) based on max_l
-        let l_size = ((self.max_l + 1) * (self.max_l + 1)) as usize;
+        let l_size = (self.max_l + 1) * (self.max_l + 1);
 
         // Calculate number of atoms in the FMS cluster
         let num_atoms = path_op_size / l_size;
@@ -811,7 +811,7 @@ impl<'a> XanesCalculator<'a> {
             // Normalize for typical K-edge cross section
             let normalization = 10.0;
 
-            return form_factor * l_factor * normalization;
+            form_factor * l_factor * normalization
         }
         // For quadrupole transition (Δl = ±2)
         else if (final_l as i32 - self.initial_l as i32).abs() == 2 {

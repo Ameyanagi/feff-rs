@@ -1,0 +1,26 @@
+* Cu K-edge FEFF10 input file
+TITLE Cu metal
+
+* Potential parameters
+EDGE      K
+S02       0.9
+CONTROL   1 1 1 1 1 1
+
+* Atomic coordinates
+* iPot Z  tag   x       y      z
+POTENTIALS
+0    29   Cu    0.0000  0.0000 0.0000
+1    29   Cu    0.0000  0.0000 0.0000
+
+ATOMS
+*   x       y       z      ipot tag
+    0.0000  0.0000  0.0000  0    Cu
+    0.0000  0.0000  3.6140  1    Cu
+    0.0000  3.6140  0.0000  1    Cu
+    0.0000  3.6140  3.6140  1    Cu
+    3.6140  0.0000  0.0000  1    Cu
+    3.6140  0.0000  3.6140  1    Cu
+    3.6140  3.6140  0.0000  1    Cu
+    3.6140  3.6140  3.6140  1    Cu
+
+END

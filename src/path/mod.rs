@@ -24,6 +24,7 @@ mod amplitude;
 mod degeneracy;
 mod filter;
 mod finder;
+#[allow(clippy::module_inception)]
 mod path;
 mod visualization;
 
