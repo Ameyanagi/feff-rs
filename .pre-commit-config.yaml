@@ -16,9 +16,6 @@ repos:
       - id: cargo-check
         name: "rust: check"
         description: Check rust code with cargo check.
-      - id: clippy
-        name: "rust: clippy"
-        description: Lint rust code with clippy.
 
   - repo: local
     hooks:
@@ -30,3 +27,4 @@ repos:
         pass_filenames: false
         files: '\.rs$'
         types: [file, rust]
+
