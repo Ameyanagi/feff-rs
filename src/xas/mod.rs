@@ -15,7 +15,7 @@ All rights reserved.
 //! approaches like multiple scattering and self-consistent field calculations.
 
 mod core_hole;
-mod exafs;
+pub mod exafs;
 mod fitting;
 pub mod thermal;
 mod xanes;

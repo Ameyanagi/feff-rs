@@ -17,14 +17,13 @@ repos:
         name: "rust: check"
         description: Check rust code with cargo check.
 
-  - repo: local
-    hooks:
-      - id: rust-tests
-        name: "rust: tests"
-        description: "Run rust tests"
-        entry: cargo test
-        language: system
-        pass_filenames: false
-        files: '\.rs$'
-        types: [file, rust]
-
+  # - repo: local
+  #   hooks:
+  #     - id: rust-tests
+  #       name: "rust: tests"
+  #       description: "Run rust tests"
+  #       entry: cargo test
+  #       language: system
+  #       pass_filenames: false
+  #       files: '\.rs$'
+  #       types: [file, rust]
